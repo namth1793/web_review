@@ -2,7 +2,24 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
 const { db } = require('../db/database');
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter(req, file, cb) {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files allowed'));
+  },
+});
 
 const JWT_SECRET = process.env.JWT_SECRET || 'insignreview_admin_secret_2026';
 
@@ -190,6 +207,25 @@ router.get('/stats', authMiddleware, (req, res) => {
   const subscribers = db.prepare('SELECT COUNT(*) as c FROM newsletter').get().c;
   const topPosts = db.prepare('SELECT id, title, views, rating FROM posts ORDER BY views DESC LIMIT 5').all();
   res.json({ posts, categories, comments, subscribers, topPosts });
+});
+
+// ===================== UPLOAD =====================
+
+// POST /api/admin/upload  — multipart/form-data, field "image"
+router.post('/upload', authMiddleware, upload.single('image'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file provided' });
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: 'web_review', resource_type: 'image' },
+        (err, result) => (err ? reject(err) : resolve(result))
+      );
+      stream.end(req.file.buffer);
+    });
+    res.json({ url: result.secure_url, public_id: result.public_id });
+  } catch (e) {
+    res.status(500).json({ error: 'Upload failed: ' + e.message });
+  }
 });
 
 module.exports = router;

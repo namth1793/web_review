@@ -36,3 +36,12 @@ export const deleteAdminCategory = (id) =>
 
 // Authors
 export const getAdminAuthors = () => api.get('/admin/authors').then(r => r.data)
+
+// Image upload
+export const adminUploadImage = (file) => {
+  const form = new FormData()
+  form.append('image', file)
+  return api.post('/admin/upload', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then(r => r.data)
+}

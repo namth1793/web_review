@@ -130,3 +130,35 @@ body {
 /* Transitions */
 a { transition: color 0.2s; }
 button { transition: all 0.2s; }
+
+/* Tiptap rich text editor */
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #6b7280;
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+.tiptap:focus { outline: none; }
+.tiptap h1 { font-size: 1.75rem; font-weight: 700; margin: 1rem 0 0.5rem; color: #f3f4f6; }
+.tiptap h2 { font-size: 1.35rem; font-weight: 700; margin: 1rem 0 0.5rem; color: #f3f4f6; border-bottom: 1px solid #374151; padding-bottom: 4px; }
+.tiptap h3 { font-size: 1.1rem; font-weight: 600; margin: 0.75rem 0 0.4rem; color: #e5e7eb; }
+.tiptap p { margin: 0 0 0.75rem; line-height: 1.75; color: #d1d5db; }
+.tiptap ul { list-style: disc; margin-left: 1.5rem; margin-bottom: 0.75rem; color: #d1d5db; }
+.tiptap ol { list-style: decimal; margin-left: 1.5rem; margin-bottom: 0.75rem; color: #d1d5db; }
+.tiptap li { margin-bottom: 0.25rem; line-height: 1.7; }
+.tiptap strong { color: #f9fafb; font-weight: 700; }
+.tiptap em { font-style: italic; }
+.tiptap u { text-decoration: underline; }
+.tiptap s { text-decoration: line-through; }
+.tiptap code { background: #374151; color: #fb923c; padding: 2px 5px; border-radius: 4px; font-size: 0.85em; font-family: monospace; }
+.tiptap pre { background: #1f2937; border-radius: 8px; padding: 1rem; margin: 0.75rem 0; overflow-x: auto; }
+.tiptap pre code { background: none; color: #e5e7eb; padding: 0; }
+.tiptap blockquote { border-left: 3px solid #ef4444; padding-left: 1rem; margin: 0.75rem 0; color: #9ca3af; font-style: italic; }
+.tiptap hr { border: none; border-top: 1px solid #374151; margin: 1.5rem 0; }
+.tiptap a { color: #60a5fa; text-decoration: underline; }
+.tiptap img { max-width: 100%; height: auto; border-radius: 8px; margin: 0.75rem 0; }
+.tiptap table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.tiptap table th { background: #374151; color: #f9fafb; padding: 8px 12px; text-align: left; font-weight: 600; border: 1px solid #4b5563; }
+.tiptap table td { padding: 8px 12px; border: 1px solid #374151; color: #d1d5db; }
+.tiptap table tr:nth-child(even) td { background: #1f2937; }
