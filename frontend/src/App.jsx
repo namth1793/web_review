@@ -8,8 +8,14 @@ import AboutUs from './pages/AboutUs'
 import TopAffiliate from './pages/TopAffiliate'
 import TagPage from './pages/TagPage'
 import SearchResults from './pages/SearchResults'
+import AdminLogin from './pages/admin/AdminLogin'
+import AdminLayout from './pages/admin/AdminLayout'
+import AdminDashboard from './pages/admin/AdminDashboard'
+import AdminPosts from './pages/admin/AdminPosts'
+import AdminPostForm from './pages/admin/AdminPostForm'
+import AdminCategories from './pages/admin/AdminCategories'
 
-export default function App() {
+function PublicLayout() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
       <Header />
@@ -26,5 +32,24 @@ export default function App() {
       </main>
       <Footer />
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <Routes>
+      {/* Admin routes — no public header/footer */}
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="posts" element={<AdminPosts />} />
+        <Route path="posts/new" element={<AdminPostForm />} />
+        <Route path="posts/:id/edit" element={<AdminPostForm />} />
+        <Route path="categories" element={<AdminCategories />} />
+      </Route>
+
+      {/* Public routes */}
+      <Route path="/*" element={<PublicLayout />} />
+    </Routes>
   )
 }

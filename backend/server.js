@@ -8,6 +8,7 @@ const tagsRouter = require('./routes/tags');
 const commentsRouter = require('./routes/comments');
 const newsletterRouter = require('./routes/newsletter');
 const searchRouter = require('./routes/search');
+const adminRouter = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 5026;
@@ -24,6 +25,7 @@ app.use('/api/tags', tagsRouter);
 app.use('/api/comments', commentsRouter);
 app.use('/api/newsletter', newsletterRouter);
 app.use('/api/search', searchRouter);
+app.use('/api/admin', adminRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'InsignReview API running on port ' + PORT });

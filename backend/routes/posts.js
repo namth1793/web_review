@@ -5,7 +5,7 @@ const { db } = require('../db/database');
 const postFields = `
   p.id, p.title, p.slug, p.excerpt, p.featured_image, p.rating, p.views,
   p.comments_count, p.is_featured, p.is_trending, p.is_top_affiliate,
-  p.pros, p.cons, p.review_highlights, p.cta_text, p.cta_url, p.created_at,
+  p.pros, p.cons, p.review_highlights, p.cta_text, p.cta_url, p.website_url, p.created_at,
   a.name as author_name, a.slug as author_slug, a.avatar as author_avatar,
   c.name as category_name, c.slug as category_slug, c.color as category_color
 `;

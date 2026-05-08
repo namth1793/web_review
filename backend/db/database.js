@@ -1,4 +1,5 @@
 const Database = require('better-sqlite3');
+const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
 
@@ -9,6 +10,13 @@ const db = new Database(path.join(dataDir, 'review.db'));
 
 function initDB() {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS admins (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
     CREATE TABLE IF NOT EXISTS authors (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -44,6 +52,7 @@ function initDB() {
       review_highlights TEXT,
       cta_text TEXT,
       cta_url TEXT,
+      website_url TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (author_id) REFERENCES authors(id),
       FOREIGN KEY (category_id) REFERENCES categories(id)
@@ -75,6 +84,13 @@ function initDB() {
     );
   `);
 
+  // Seed admin
+  const adminCount = db.prepare('SELECT COUNT(*) as c FROM admins').get();
+  if (adminCount.c === 0) {
+    const hash = bcrypt.hashSync('admin123', 10);
+    db.prepare('INSERT INTO admins (username, email, password_hash) VALUES (?, ?, ?)').run('admin', 'admin@insignreview.com', hash);
+  }
+
   const existing = db.prepare('SELECT COUNT(*) as c FROM categories').get();
   if (existing.c > 0) return;
 
@@ -94,6 +110,7 @@ function initDB() {
   insertCat.run('Dating', 'dating', 'Reviews of dating apps and relationship platforms.', '#ef4444');
   insertCat.run('Gaming', 'gaming', 'Reviews of gaming tools, platforms, and resources.', '#eab308');
   insertCat.run('Music', 'music', 'Reviews of music creation tools and streaming platforms.', '#6366f1');
+  insertCat.run('Home & Living', 'home-living', 'Reviews of home decor, furniture, curtains, appliances, and lifestyle products.', '#f59e0b');
 
   // Tags
   const insertTag = db.prepare('INSERT INTO tags (name, slug) VALUES (?, ?)');
@@ -104,7 +121,8 @@ function initDB() {
     ['Health & Fitness', 'health-fitness'], ['Dating Apps', 'dating-apps'],
     ['Pixel Art', 'pixel-art'], ['No-Code', 'no-code'],
     ['Affiliate Program', 'affiliate-program'], ['Review 2026', 'review-2026'],
-    ['Social Trading', 'social-trading']
+    ['Social Trading', 'social-trading'], ['Home Decor', 'home-decor'],
+    ['SEO', 'seo'], ['Content Marketing', 'content-marketing'], ['3D Printing', '3d-printing']
   ];
   tagData.forEach(([name, slug]) => insertTag.run(name, slug));
 
@@ -112,8 +130,8 @@ function initDB() {
   const insertPost = db.prepare(`
     INSERT INTO posts (title, slug, excerpt, content, featured_image, author_id, category_id,
       rating, views, comments_count, is_featured, is_trending, is_top_affiliate,
-      pros, cons, review_highlights, cta_text, cta_url, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      pros, cons, review_highlights, cta_text, cta_url, website_url, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const posts = [
@@ -144,11 +162,7 @@ function initDB() {
 <h3>Serverless GPU</h3>
 <p>RunPod's serverless endpoint feature allows you to build scalable AI APIs that only charge you for compute actually used. This is ideal for production AI applications with variable traffic.</p>
 
-<h3>Storage Options</h3>
-<p>RunPod offers persistent network volumes that survive pod restarts, making it practical for long-running projects and dataset storage.</p>
-
 <h2>RunPod Pricing</h2>
-<p>RunPod's pricing is one of its biggest selling points. Here's a representative snapshot of GPU pricing as of 2026:</p>
 <table>
   <thead><tr><th>GPU</th><th>VRAM</th><th>Community Price/hr</th><th>Secure Price/hr</th></tr></thead>
   <tbody>
@@ -159,36 +173,15 @@ function initDB() {
   </tbody>
 </table>
 
-<h2>RunPod vs. Competitors</h2>
-<p>Compared to major cloud providers, RunPod's advantage is clear on cost. AWS p4d.24xlarge (8× A100) runs around $32/hr — whereas RunPod can deliver similar compute for under $12/hr. Lambda Labs and Vast.ai are the closest competitors, with prices often within 10–20% of RunPod's community cloud.</p>
-
-<h2>Who Should Use RunPod?</h2>
-<ul>
-  <li>AI/ML researchers and developers needing affordable compute</li>
-  <li>Content creators running Stable Diffusion or video generation models</li>
-  <li>Startups building and deploying AI products</li>
-  <li>Data scientists running training experiments</li>
-</ul>
-
-<h2>Frequently Asked Questions</h2>
-<h3>Is RunPod good for beginners?</h3>
-<p>Yes, with caveats. The pre-built templates make starting easy, but understanding networking, volumes, and pod management requires some technical knowledge. Beginners should start with the Secure Cloud to avoid unexpected downtime.</p>
-
-<h3>Is RunPod safe?</h3>
-<p>RunPod's Secure Cloud uses professional datacenters. Community Cloud instances run on third-party hardware, so sensitive data should stay on Secure Cloud.</p>
-
-<h3>Does RunPod have a free trial?</h3>
-<p>RunPod doesn't offer a traditional free trial but lets you top up as little as $10 to get started — and you only pay for what you use.</p>
-
 <h2>Final Verdict</h2>
-<p>RunPod is an exceptional choice for developers who need affordable, flexible GPU compute. The combination of competitive pricing, a wide GPU catalog, serverless endpoints, and a growing template library makes it one of the best GPU cloud platforms available in 2026. If you're spending significant money on cloud AI compute, RunPod can cut your bill dramatically.</p>`,
+<p>RunPod is an exceptional choice for developers who need affordable, flexible GPU compute. The combination of competitive pricing, a wide GPU catalog, serverless endpoints, and a growing template library makes it one of the best GPU cloud platforms available in 2026.</p>`,
       featured_image: 'https://picsum.photos/seed/runpod2026/800/500',
       author_id: 1, category_id: 1, rating: 9.2, views: 15420, comments_count: 24,
       is_featured: 1, is_trending: 1, is_top_affiliate: 1,
       pros: JSON.stringify(['Starting at $0.44/hr for RTX 4090', 'Wide GPU selection from RTX to H100', 'Serverless GPU endpoints', 'Fast deployment with pre-built templates', 'Active developer community']),
       cons: JSON.stringify(['Community Cloud has variable uptime', 'Complex for complete beginners', 'Pricing fluctuates with availability']),
       review_highlights: JSON.stringify([{ label: 'Starting Price', value: '$0.44/hr' }, { label: 'Active Developers', value: '500K+' }, { label: 'Global Regions', value: '30+' }]),
-      cta_text: 'Start Using RunPod Free', cta_url: '#',
+      cta_text: 'Start Using RunPod Free', cta_url: 'https://runpod.io', website_url: 'https://runpod.io',
       created_at: '2026-03-25 10:00:00'
     },
     {
@@ -202,13 +195,10 @@ function initDB() {
 
 <h2>Key Features</h2>
 <h3>Voice Cloning</h3>
-<p>ElevenLabs' voice cloning is arguably its most powerful feature. With as little as 1 minute of audio, the platform can create a custom voice model that sounds remarkably like the original speaker. This is used by content creators, brands, and developers to create consistent voice experiences at scale.</p>
+<p>ElevenLabs' voice cloning is arguably its most powerful feature. With as little as 1 minute of audio, the platform can create a custom voice model that sounds remarkably like the original speaker.</p>
 
 <h3>Multilingual Support</h3>
-<p>With support for 29+ languages including English, Spanish, French, German, Japanese, and Hindi, ElevenLabs is a strong choice for global applications. The multilingual model maintains natural accent and intonation in each language.</p>
-
-<h3>Projects Feature</h3>
-<p>The Projects feature lets you manage long-form audio production — import text documents, assign voices to different characters, and export studio-quality audio files. This is ideal for audiobook production.</p>
+<p>With support for 29+ languages including English, Spanish, French, German, Japanese, and Hindi, ElevenLabs is a strong choice for global applications.</p>
 
 <h2>ElevenLabs Pricing</h2>
 <table>
@@ -221,34 +211,15 @@ function initDB() {
   </tbody>
 </table>
 
-<h2>Voice Quality Comparison</h2>
-<p>In blind listening tests, ElevenLabs consistently outperforms competitors on naturalness and emotional range. The voices avoid the robotic cadence common in older TTS systems and handle complex punctuation, emphasis, and pacing with impressive accuracy.</p>
-
-<h2>Who Should Use ElevenLabs?</h2>
-<ul>
-  <li>Content creators producing podcasts or YouTube videos</li>
-  <li>Audiobook publishers looking to cut narration costs</li>
-  <li>Developers building voice assistants or chatbots</li>
-  <li>Educators creating accessible course materials</li>
-  <li>Businesses needing multilingual customer service voiceovers</li>
-</ul>
-
-<h2>Frequently Asked Questions</h2>
-<h3>Is ElevenLabs free?</h3>
-<p>Yes, ElevenLabs offers a free plan with 10,000 characters per month — enough for testing and small projects. Paid plans scale from $5/month.</p>
-
-<h3>Can ElevenLabs clone my voice?</h3>
-<p>Yes. Instant Voice Cloning requires just 1–5 minutes of clean audio. Professional Voice Cloning (higher accuracy) requires more samples and is available on Creator plans and above.</p>
-
 <h2>Final Verdict</h2>
-<p>ElevenLabs remains the leader in AI voice generation in 2026. Its combination of voice quality, language breadth, voice cloning capability, and developer API makes it the top choice for anyone serious about AI audio. The free tier is generous enough to evaluate thoroughly before committing to a paid plan.</p>`,
+<p>ElevenLabs remains the leader in AI voice generation in 2026. Its combination of voice quality, language breadth, voice cloning capability, and developer API makes it the top choice for anyone serious about AI audio.</p>`,
       featured_image: 'https://picsum.photos/seed/elevenlabs2026/800/500',
       author_id: 1, category_id: 1, rating: 9.0, views: 12800, comments_count: 18,
       is_featured: 0, is_trending: 1, is_top_affiliate: 1,
       pros: JSON.stringify(['Ultra-realistic voice synthesis', 'Voice cloning from short audio samples', '29+ languages supported', 'Easy-to-use API', 'Generous free tier']),
       cons: JSON.stringify(['Free tier limited to 10,000 chars/month', 'Premium features require paid plan', 'Occasionally robotic on very long texts']),
       review_highlights: JSON.stringify([{ label: 'Languages', value: '29+' }, { label: 'Voices Available', value: '3,000+' }, { label: 'Free Tier', value: '10K chars/mo' }]),
-      cta_text: 'Try ElevenLabs Free', cta_url: '#',
+      cta_text: 'Try ElevenLabs Free', cta_url: 'https://elevenlabs.io', website_url: 'https://elevenlabs.io',
       created_at: '2026-04-01 09:00:00'
     },
     {
@@ -264,69 +235,32 @@ function initDB() {
 <h3>Instant Funding</h3>
 <p>The most popular program at The5ers. Traders pay a one-time fee and receive a funded account immediately. No evaluation phase required. Available from $10,000 to $100,000 in starting capital.</p>
 
-<h3>High Stakes</h3>
-<p>A one-step evaluation program targeting traders who prefer a challenge. Pass the targets and receive a funded account with a higher starting balance and more favorable terms.</p>
-
-<h3>Bootcamp</h3>
-<p>A beginner-friendly program designed to help new traders develop discipline and consistency while trading with real capital at lower risk levels.</p>
-
 <h2>Profit Split and Scaling</h2>
-<p>The5ers starts traders at a 50% profit split for Instant Funding, scaling to 80% as traders demonstrate consistent performance. The scaling plan allows accounts to grow from $10K all the way up to $4,000,000 in funded capital.</p>
-
 <table>
   <thead><tr><th>Program</th><th>Starting Capital</th><th>One-Time Fee</th><th>Profit Split</th></tr></thead>
   <tbody>
     <tr><td>Instant Funding ($10K)</td><td>$10,000</td><td>$95</td><td>50% → 80%</td></tr>
     <tr><td>Instant Funding ($25K)</td><td>$25,000</td><td>$225</td><td>50% → 80%</td></tr>
     <tr><td>Instant Funding ($100K)</td><td>$100,000</td><td>$875</td><td>50% → 80%</td></tr>
-    <tr><td>High Stakes ($50K)</td><td>$50,000</td><td>$390</td><td>60% → 80%</td></tr>
   </tbody>
 </table>
 
-<h2>Trading Rules</h2>
-<p>The5ers enforces clear risk management rules:</p>
-<ul>
-  <li><strong>Max Daily Loss:</strong> 4% of account balance</li>
-  <li><strong>Max Total Drawdown:</strong> 5% of starting balance (trailing)</li>
-  <li>No restrictions on trading styles (scalping, swing, overnight positions allowed)</li>
-  <li>News trading permitted on most programs</li>
-  <li>Weekend holding allowed on High Stakes and Bootcamp</li>
-</ul>
-
-<h2>Who Should Join The5ers?</h2>
-<ul>
-  <li>Experienced retail traders wanting institutional capital</li>
-  <li>Traders with a proven strategy who need more capital to scale</li>
-  <li>Forex, indices, and commodities traders</li>
-  <li>Those seeking a long-term trading career with a reputable firm</li>
-</ul>
-
-<h2>Frequently Asked Questions</h2>
-<h3>Is The5ers legitimate?</h3>
-<p>Yes. The5ers has been operating since 2016, has funded thousands of traders, and is regulated. They have a strong track record of paying out profits and maintaining transparent relationships with funded traders.</p>
-
-<h3>How quickly can I withdraw profits?</h3>
-<p>Withdrawals are processed bi-weekly. Most traders receive their first payout within 30 days of their first profitable period.</p>
-
 <h2>Final Verdict</h2>
-<p>The5ers stands out in the crowded prop firm space for its longevity, transparent rules, and genuine scaling potential. The Instant Funding option is particularly attractive for experienced traders who want to skip the evaluation phase. If you have a proven trading strategy, The5ers is one of the best platforms available to amplify your results.</p>`,
+<p>The5ers stands out in the crowded prop firm space for its longevity, transparent rules, and genuine scaling potential. The Instant Funding option is particularly attractive for experienced traders who want to skip the evaluation phase.</p>`,
       featured_image: 'https://picsum.photos/seed/the5ers2025/800/500',
       author_id: 2, category_id: 2, rating: 8.9, views: 9600, comments_count: 31,
       is_featured: 1, is_trending: 0, is_top_affiliate: 1,
       pros: JSON.stringify(['Instant funding available without evaluation', 'Profit split scales up to 80%', 'Flexible trading rules (scalping, news, overnight)', 'Available in 100+ countries', 'Scaling plan up to $4M in capital']),
       cons: JSON.stringify(['One-time fee required upfront', 'Trailing drawdown can be restrictive', 'Weekend holding restricted on some plans']),
       review_highlights: JSON.stringify([{ label: 'Instant Funding', value: '$10K–$100K' }, { label: 'Max Profit Split', value: '80%' }, { label: 'Countries', value: '100+' }]),
-      cta_text: 'Join The5ers Now', cta_url: '#',
+      cta_text: 'Join The5ers Now', cta_url: 'https://the5ers.com', website_url: 'https://the5ers.com',
       created_at: '2026-02-14 08:00:00'
     },
     {
       title: 'AdCreative.ai Review: The AI Secret to 14x Higher Conversions',
       slug: 'adcreative-ai-review',
       excerpt: 'AdCreative.ai uses AI to generate high-converting ad creatives at scale. Can it really deliver 14x better conversion rates compared to manually designed ads?',
-      content: `<p><strong>AdCreative.ai</strong> is an AI-powered platform that generates advertising creatives — banners, social media ads, and display ads — automatically. The platform claims its AI-generated creatives outperform human-designed ones by up to 14x in conversion rate. We put that claim to the test.</p>
-
-<h2>What Is AdCreative.ai?</h2>
-<p>AdCreative.ai connects to your brand assets (logo, colors, fonts) and generates hundreds of ad variants optimized for conversions. It integrates directly with Google Ads, Meta Ads, and other major advertising platforms.</p>
+      content: `<p><strong>AdCreative.ai</strong> is an AI-powered platform that generates advertising creatives — banners, social media ads, and display ads — automatically. The platform claims its AI-generated creatives outperform human-designed ones by up to 14x in conversion rate.</p>
 
 <h2>Key Features</h2>
 <h3>AI-Powered Creative Generation</h3>
@@ -334,9 +268,6 @@ function initDB() {
 
 <h3>Creative Scoring</h3>
 <p>Every generated creative receives a conversion probability score (0–100). This allows you to prioritize the strongest creatives before spending ad budget testing them.</p>
-
-<h3>Multi-Platform Export</h3>
-<p>Export creatives in the exact dimensions required for Google Display, Facebook, Instagram, LinkedIn, and more — all from a single generation session.</p>
 
 <h2>Pricing</h2>
 <table>
@@ -348,38 +279,29 @@ function initDB() {
   </tbody>
 </table>
 
-<h2>Does the 14x Claim Hold Up?</h2>
-<p>The 14x figure is based on AdCreative.ai's internal data comparing AI-generated creatives to static, manually designed ones across their customer base. In independent testing, results vary — but AI-generated creatives consistently outperform untested manual designs, especially for e-commerce and lead generation campaigns.</p>
-
 <h2>Final Verdict</h2>
-<p>AdCreative.ai delivers genuine value for businesses running paid advertising. The creative scoring feature alone saves significant A/B testing budget. While the 14x claim is optimistic for all use cases, even a 2–3x improvement in creative performance can dramatically reduce customer acquisition costs. Highly recommended for digital marketers and growth teams.</p>`,
+<p>AdCreative.ai delivers genuine value for businesses running paid advertising. The creative scoring feature alone saves significant A/B testing budget. Highly recommended for digital marketers and growth teams.</p>`,
       featured_image: 'https://picsum.photos/seed/adcreative2025/800/500',
       author_id: 1, category_id: 1, rating: 8.8, views: 7400, comments_count: 12,
       is_featured: 0, is_trending: 0, is_top_affiliate: 1,
       pros: JSON.stringify(['Generates hundreds of ad variants instantly', 'Creative scoring predicts conversion potential', 'Direct integration with major ad platforms', '7-day free trial available', 'Saves significant design time and budget']),
       cons: JSON.stringify(['14x claim overstated for some industries', 'Starter plan creative limit is restrictive', 'Requires quality brand assets for best results']),
       review_highlights: JSON.stringify([{ label: 'Conversion Boost', value: 'Up to 14x' }, { label: 'Ad Formats', value: '50+' }, { label: 'Integrations', value: 'Google, Meta, TikTok' }]),
-      cta_text: 'Try AdCreative.ai Free', cta_url: '#',
+      cta_text: 'Try AdCreative.ai Free', cta_url: 'https://adcreative.ai', website_url: 'https://adcreative.ai',
       created_at: '2026-01-20 10:00:00'
     },
     {
       title: 'Bookmap Review 2026: The Ultimate Order Flow Tool for Traders?',
       slug: 'bookmap-review-2026',
       excerpt: 'Bookmap visualizes real-time order flow and market depth with a unique heatmap interface. Does this professional trading tool give you a real edge?',
-      content: `<p><strong>Bookmap</strong> is a specialized trading platform that visualizes market microstructure — specifically, the limit order book (LOB) depth — using a heatmap that evolves in real time. Institutional traders and serious retail traders use it to identify large buy/sell walls, spoofing patterns, and absorption events that are invisible on standard candlestick charts.</p>
-
-<h2>What Makes Bookmap Unique?</h2>
-<p>Traditional charts show you price over time. Bookmap shows you <em>liquidity over price and time</em> simultaneously. The heatmap reveals where large orders are sitting in the order book — allowing traders to anticipate price movements before they happen.</p>
+      content: `<p><strong>Bookmap</strong> is a specialized trading platform that visualizes market microstructure using a heatmap that evolves in real time. Institutional traders and serious retail traders use it to identify large buy/sell walls, spoofing patterns, and absorption events that are invisible on standard candlestick charts.</p>
 
 <h2>Key Features</h2>
 <h3>Real-Time Heatmap</h3>
-<p>The heatmap colors represent order density at each price level. Dark red indicates heavy sell-side liquidity; dark green indicates heavy buy-side. As price approaches these levels, you can gauge whether the wall will hold or be swept.</p>
-
-<h3>Volume Dots</h3>
-<p>Every executed trade is plotted as a dot sized proportionally to its volume. This allows identification of large institutional prints in real time.</p>
+<p>The heatmap colors represent order density at each price level. Dark red indicates heavy sell-side liquidity; dark green indicates heavy buy-side.</p>
 
 <h3>Historical Replay</h3>
-<p>Bookmap allows full replay of historical sessions with the heatmap intact — an invaluable feature for backtesting order flow strategies and studying past key events.</p>
+<p>Bookmap allows full replay of historical sessions with the heatmap intact — an invaluable feature for backtesting order flow strategies.</p>
 
 <h2>Pricing</h2>
 <table>
@@ -390,69 +312,51 @@ function initDB() {
   </tbody>
 </table>
 
-<h2>Who Is Bookmap For?</h2>
-<p>Bookmap is designed for active day traders and scalpers who trade futures, stocks, forex, or crypto. If you trade longer timeframes or rely purely on technical indicators, Bookmap may not add significant value. But for intraday traders who want to understand market microstructure, it's one of the most powerful tools available.</p>
-
 <h2>Final Verdict</h2>
-<p>Bookmap delivers a genuinely differentiated view of the market that no standard charting platform provides. For serious intraday traders, the insight into order flow dynamics is worth the subscription cost many times over. The 14-day free trial is generous enough to properly evaluate whether order flow analysis fits your trading style.</p>`,
+<p>Bookmap delivers a genuinely differentiated view of the market that no standard charting platform provides. For serious intraday traders, the insight into order flow dynamics is worth the subscription cost many times over.</p>`,
       featured_image: 'https://picsum.photos/seed/bookmap2026/800/500',
       author_id: 2, category_id: 2, rating: 8.6, views: 6200, comments_count: 9,
       is_featured: 1, is_trending: 0, is_top_affiliate: 0,
       pros: JSON.stringify(['Unique real-time order flow heatmap', 'Identifies institutional order walls', 'Full historical replay functionality', 'Works across stocks, futures, and crypto', 'Advanced add-on ecosystem']),
       cons: JSON.stringify(['Steep learning curve for new traders', 'Subscription cost adds up', 'Requires reliable high-speed internet', 'Overkill for swing/position traders']),
       review_highlights: JSON.stringify([{ label: 'Data Feed', value: 'Real-Time' }, { label: 'Markets', value: 'Stocks, Futures, Crypto' }, { label: 'Free Trial', value: '14 Days' }]),
-      cta_text: 'Try Bookmap Free for 14 Days', cta_url: '#',
+      cta_text: 'Try Bookmap Free for 14 Days', cta_url: 'https://bookmap.com', website_url: 'https://bookmap.com',
       created_at: '2026-04-10 11:00:00'
     },
     {
       title: 'Airalo eSIM Review 2026: Best eSIM for International Travel?',
       slug: 'airalo-esim-review-2026',
       excerpt: 'Airalo offers affordable eSIM data plans for 200+ countries. Say goodbye to expensive roaming charges with this top-rated travel eSIM provider.',
-      content: `<p>Every frequent traveler dreads the moment they land abroad and face the choice: pay outrageous roaming fees, hunt for a local SIM card shop, or go without data. <strong>Airalo</strong> offers a fourth option — and it's the best one. As the world's largest eSIM marketplace, Airalo gives you instant connectivity in 200+ countries before you even leave home.</p>
-
-<h2>What Is Airalo?</h2>
-<p>Airalo is a marketplace for eSIM data plans. Unlike a single carrier, Airalo aggregates plans from local telecom providers around the world and delivers them digitally via QR code to any eSIM-compatible device. You purchase a plan for your destination, scan the QR code, and your phone connects automatically when you land.</p>
+      content: `<p><strong>Airalo</strong> is the world's largest eSIM marketplace, giving you instant connectivity in 200+ countries before you even leave home.</p>
 
 <h2>How It Works</h2>
 <ol>
   <li>Download the Airalo app or visit the website</li>
   <li>Search for your destination country or region</li>
-  <li>Choose a data plan (ranging from 1 GB to 20 GB+)</li>
-  <li>Install via QR code — takes under 2 minutes</li>
+  <li>Choose a data plan and install via QR code</li>
   <li>Enable the eSIM when you arrive and enjoy local data rates</li>
 </ol>
 
 <h2>Pricing Examples</h2>
 <table>
-  <thead><tr><th>Region/Country</th><th>Data</th><th>Validity</th><th>Price</th></tr></thead>
+  <thead><tr><th>Region</th><th>Data</th><th>Validity</th><th>Price</th></tr></thead>
   <tbody>
     <tr><td>Europe (39 countries)</td><td>3 GB</td><td>30 days</td><td>$12</td></tr>
     <tr><td>USA</td><td>3 GB</td><td>30 days</td><td>$13</td></tr>
     <tr><td>Japan</td><td>3 GB</td><td>30 days</td><td>$9.50</td></tr>
-    <tr><td>Southeast Asia (13 countries)</td><td>3 GB</td><td>30 days</td><td>$10</td></tr>
-    <tr><td>Global (100+ countries)</td><td>3 GB</td><td>30 days</td><td>$29</td></tr>
+    <tr><td>Southeast Asia</td><td>3 GB</td><td>30 days</td><td>$10</td></tr>
   </tbody>
 </table>
 
-<h2>Savings Compared to Roaming</h2>
-<p>US carriers typically charge $10–$15 per day for international day passes, or $0.02–$0.05 per MB for roaming data. A week in Europe using carrier roaming can cost $70–$105 in day passes alone. The equivalent Airalo plan costs around $12 for 30 days. The savings are dramatic.</p>
-
-<h2>Limitations</h2>
-<ul>
-  <li>Voice calls and SMS are not included on most plans (data only)</li>
-  <li>Requires an eSIM-compatible smartphone (iPhone XS+, most Android flagships)</li>
-  <li>Data speed varies by local carrier quality</li>
-</ul>
-
 <h2>Final Verdict</h2>
-<p>Airalo has fundamentally changed how travelers stay connected abroad. The combination of instant activation, huge country coverage, and dramatically lower prices than carrier roaming makes it essential for any frequent international traveler. Buy a plan, scan the QR code, and forget about connectivity stress forever.</p>`,
+<p>Airalo has fundamentally changed how travelers stay connected abroad. The combination of instant activation, huge country coverage, and dramatically lower prices than carrier roaming makes it essential for any frequent international traveler.</p>`,
       featured_image: 'https://picsum.photos/seed/airalo2026/800/500',
       author_id: 2, category_id: 3, rating: 9.1, views: 11200, comments_count: 28,
       is_featured: 1, is_trending: 1, is_top_affiliate: 0,
       pros: JSON.stringify(['Coverage in 200+ countries', 'Dramatically cheaper than carrier roaming', 'Instant activation via QR code', 'No physical SIM swap needed', 'Regional plans cover multiple countries']),
       cons: JSON.stringify(['Voice calls not included on most plans', 'Requires eSIM-compatible smartphone', 'Data speed varies by local carrier']),
       review_highlights: JSON.stringify([{ label: 'Countries', value: '200+' }, { label: 'Starting Price', value: '$4.50' }, { label: 'Activation', value: 'Instant' }]),
-      cta_text: 'Get Airalo eSIM Now', cta_url: '#',
+      cta_text: 'Get Airalo eSIM Now', cta_url: 'https://airalo.com', website_url: 'https://airalo.com',
       created_at: '2026-03-05 09:30:00'
     },
     {
@@ -463,86 +367,52 @@ function initDB() {
 
 <h2>Key Features</h2>
 <h3>Genre and Mood Selection</h3>
-<p>Choose from 50+ genres (hip-hop, electronic, jazz, classical, lo-fi, pop, and more) and set the mood with descriptors like "energetic," "melancholic," "uplifting," or "aggressive." The AI composes a track matching your specifications in seconds.</p>
+<p>Choose from 50+ genres and set the mood with descriptors like "energetic," "melancholic," "uplifting," or "aggressive."</p>
 
 <h3>Royalty-Free Commercial License</h3>
-<p>Every track generated on Freebeat comes with a commercial license — safe to use on YouTube, TikTok, Spotify, Instagram, and in commercial projects without copyright claims.</p>
-
-<h3>Customization</h3>
-<p>Adjust BPM, key, duration, and instrument emphasis. You can also provide a reference track for the AI to match stylistically.</p>
-
-<h2>Pricing</h2>
-<p>Freebeat offers a free tier with limited monthly generations. Paid plans start at $9.99/month for unlimited generations with full commercial licensing. An annual plan drops the cost to $7.99/month.</p>
-
-<h2>Best Use Cases</h2>
-<ul>
-  <li>YouTube video background music</li>
-  <li>Podcast intros and outros</li>
-  <li>Instagram Reels and TikTok videos</li>
-  <li>Corporate presentation soundtracks</li>
-  <li>Game background music for indie developers</li>
-</ul>
+<p>Every track generated on Freebeat comes with a commercial license — safe to use on YouTube, TikTok, Spotify, Instagram, and in commercial projects.</p>
 
 <h2>Final Verdict</h2>
-<p>Freebeat.ai is a genuinely useful tool for content creators who need royalty-free music without the complexity of music licensing. The output quality has improved significantly with recent model updates. At under $10/month, it's excellent value for regular content producers.</p>`,
+<p>Freebeat.ai is a genuinely useful tool for content creators who need royalty-free music. At under $10/month, it's excellent value for regular content producers.</p>`,
       featured_image: 'https://picsum.photos/seed/freebeat2025/800/500',
       author_id: 1, category_id: 5, rating: 8.5, views: 5800, comments_count: 7,
       is_featured: 0, is_trending: 0, is_top_affiliate: 0,
       pros: JSON.stringify(['Royalty-free commercial license included', '50+ genres and mood options', 'No music knowledge required', 'Instant generation', 'Affordable pricing']),
       cons: JSON.stringify(['Free plan has limited monthly generations', 'Some tracks sound formulaic', 'Complex compositions still need human producers']),
       review_highlights: JSON.stringify([{ label: 'Genres', value: '50+' }, { label: 'License', value: 'Royalty-Free' }, { label: 'Export', value: 'MP3 & WAV' }]),
-      cta_text: 'Create Music Free', cta_url: '#',
+      cta_text: 'Create Music Free', cta_url: 'https://freebeat.ai', website_url: 'https://freebeat.ai',
       created_at: '2026-02-28 14:00:00'
     },
     {
       title: 'Base44 Review 2025: Build Full-Stack Apps with Plain English',
       slug: 'base44-review-2025',
       excerpt: 'Base44 lets anyone build complete web applications by describing them in plain English. No coding required — but how far can it really take you?',
-      content: `<p><strong>Base44</strong> is a no-code AI platform where you describe the app you want in natural language and the platform builds it — frontend, backend, database, and all. It represents the leading edge of the "vibe coding" movement, where business logic is expressed in English rather than code.</p>
-
-<h2>What Can Base44 Build?</h2>
-<p>Base44 can generate CRMs, inventory management systems, booking platforms, dashboards, internal tools, and simple consumer apps. The generated apps include user authentication, database integration, and responsive UI — all without writing a single line of code.</p>
+      content: `<p><strong>Base44</strong> is a no-code AI platform where you describe the app you want in natural language and the platform builds it — frontend, backend, database, and all.</p>
 
 <h2>How It Works</h2>
 <ol>
-  <li>Describe your app: "I need a customer support ticket system where users can submit tickets and agents can resolve them with status updates."</li>
+  <li>Describe your app in plain English</li>
   <li>Base44 generates the full app in 30–60 seconds</li>
   <li>Review and refine using follow-up prompts</li>
-  <li>Deploy with one click to a Base44 subdomain or your own domain</li>
+  <li>Deploy with one click</li>
 </ol>
 
-<h2>Pricing</h2>
-<table>
-  <thead><tr><th>Plan</th><th>Monthly</th><th>Apps</th><th>Users</th></tr></thead>
-  <tbody>
-    <tr><td>Free</td><td>$0</td><td>3</td><td>5 per app</td></tr>
-    <tr><td>Pro</td><td>$49</td><td>Unlimited</td><td>50 per app</td></tr>
-    <tr><td>Business</td><td>$149</td><td>Unlimited</td><td>Unlimited</td></tr>
-  </tbody>
-</table>
-
-<h2>Limitations</h2>
-<p>Base44 works well for CRUD applications and internal tools. Complex business logic, custom integrations with proprietary APIs, or highly customized UI/UX beyond its template system still requires developer involvement. Think of it as 80% of the work done for you — the remaining 20% may still need a developer.</p>
-
 <h2>Final Verdict</h2>
-<p>Base44 is genuinely impressive for non-technical founders and internal tool builders. If you need a functional business application without a developer budget, Base44 can deliver something viable in under an hour. For production consumer apps requiring sophisticated UX, it's a starting point rather than a complete solution.</p>`,
+<p>Base44 is genuinely impressive for non-technical founders and internal tool builders. If you need a functional business application without a developer budget, Base44 can deliver something viable in under an hour.</p>`,
       featured_image: 'https://picsum.photos/seed/base442025/800/500',
       author_id: 1, category_id: 1, rating: 8.7, views: 4300, comments_count: 5,
       is_featured: 0, is_trending: 0, is_top_affiliate: 1,
       pros: JSON.stringify(['Build apps in plain English — no coding needed', 'Full-stack: frontend + backend + database', 'One-click deployment', 'Affordable pricing vs hiring developers', 'Iterative refinement with follow-up prompts']),
       cons: JSON.stringify(['Complex business logic still requires developers', 'Limited UI customization', 'Relatively new platform with occasional bugs']),
       review_highlights: JSON.stringify([{ label: 'Build Time', value: '< 60 Seconds' }, { label: 'Tech Required', value: 'None' }, { label: 'Free Plan', value: 'Available' }]),
-      cta_text: 'Try Base44 Free', cta_url: '#',
+      cta_text: 'Try Base44 Free', cta_url: 'https://base44.com', website_url: 'https://base44.com',
       created_at: '2025-11-15 10:00:00'
     },
     {
       title: 'SafetyWing Review 2025: Is Nomad Insurance Worth $56/Month?',
       slug: 'safetywing-review-2025',
       excerpt: 'SafetyWing offers flexible travel medical insurance for digital nomads and long-term travelers starting at $56.28/month. Is it the right coverage for your lifestyle?',
-      content: `<p><strong>SafetyWing</strong> has become the default travel insurance recommendation in the digital nomad community. Its subscription-based model, low price point, and global coverage make it uniquely suited for people living abroad long-term rather than taking short vacations.</p>
-
-<h2>What Does SafetyWing Cover?</h2>
-<p>SafetyWing's Nomad Insurance is a travel medical plan — it covers emergency medical treatment, hospital stays, emergency dental, evacuation, and trip interruption. It is <em>not</em> a full travel insurance policy (it doesn't cover baggage loss, trip cancellation, or pre-existing conditions in most cases).</p>
+      content: `<p><strong>SafetyWing</strong> has become the default travel insurance recommendation in the digital nomad community. Its subscription-based model, low price point, and global coverage make it uniquely suited for people living abroad long-term.</p>
 
 <h2>Coverage Details</h2>
 <ul>
@@ -550,98 +420,75 @@ function initDB() {
   <li><strong>Hospital deductible:</strong> $250 per period</li>
   <li><strong>Emergency evacuation:</strong> Up to $100,000</li>
   <li><strong>COVID-19:</strong> Covered if treated like any other illness</li>
-  <li><strong>Home country coverage:</strong> 30 days included every 90 days</li>
 </ul>
 
 <h2>Pricing</h2>
-<p>SafetyWing uses a subscription model — you're charged every 4 weeks. The price is the same regardless of destination:</p>
 <ul>
   <li><strong>Age 10–39:</strong> $56.28 per 4 weeks</li>
   <li><strong>Age 40–49:</strong> $92.40 per 4 weeks</li>
   <li><strong>Age 50–59:</strong> $163.24 per 4 weeks</li>
 </ul>
 
-<h2>Who Is It Best For?</h2>
-<p>SafetyWing is ideal for: digital nomads traveling for 3+ months, remote workers based abroad, and budget-conscious long-term travelers. It's less ideal for those wanting comprehensive trip protection including baggage and cancellation coverage.</p>
-
 <h2>Final Verdict</h2>
-<p>SafetyWing delivers excellent value for its core use case: emergency medical coverage while living abroad long-term. The subscription flexibility (cancel anytime) and competitive pricing for under-40 travelers make it the go-to choice in the nomad community. Just understand what it doesn't cover before relying on it exclusively.</p>`,
+<p>SafetyWing delivers excellent value for its core use case: emergency medical coverage while living abroad long-term. The subscription flexibility (cancel anytime) and competitive pricing make it the go-to choice in the nomad community.</p>`,
       featured_image: 'https://picsum.photos/seed/safetywing2025/800/500',
       author_id: 2, category_id: 3, rating: 8.3, views: 4100, comments_count: 14,
       is_featured: 0, is_trending: 0, is_top_affiliate: 0,
       pros: JSON.stringify(['Affordable subscription pricing', 'Cancel or pause anytime', 'COVID-19 medical treatment covered', 'Works in 180+ countries', 'Includes 30 days home country coverage']),
       cons: JSON.stringify(['No baggage or trip cancellation coverage', 'Pre-existing conditions mostly excluded', 'US citizens must be outside US to enroll']),
       review_highlights: JSON.stringify([{ label: 'Starting Price', value: '$56.28/4 wks' }, { label: 'Max Coverage', value: '$250,000' }, { label: 'Countries', value: '180+' }]),
-      cta_text: 'Get SafetyWing Coverage', cta_url: '#',
+      cta_text: 'Get SafetyWing Coverage', cta_url: 'https://safetywing.com', website_url: 'https://safetywing.com',
       created_at: '2025-10-20 09:00:00'
     },
     {
       title: 'MVMT Watches Review 2025: Stylish Timepieces or Overhyped?',
       slug: 'mvmt-watches-review-2025',
       excerpt: 'MVMT watches offer minimalist designs at accessible price points. But do they justify the premium over mass-market alternatives, or are you just paying for marketing?',
-      content: `<p><strong>MVMT</strong> (pronounced "movement") launched in 2013 via Kickstarter and grew rapidly through social media marketing. The brand positions itself as premium affordable — watches that look expensive but cost $100–$250. But after the initial hype, how do MVMT watches hold up in 2025?</p>
+      content: `<p><strong>MVMT</strong> launched in 2013 via Kickstarter and grew rapidly through social media marketing. The brand positions itself as premium affordable — watches that look expensive but cost $100–$250.</p>
 
 <h2>Build Quality and Materials</h2>
-<p>MVMT uses 316L stainless steel cases, mineral crystal glass (not sapphire), and Japanese Miyota quartz movements. At $150, this material spec is reasonable. The finishing is clean and the dial printing is sharp. However, the mineral crystal scratches more easily than sapphire, and the Miyota movement, while reliable, is not particularly impressive at this price point.</p>
+<p>MVMT uses 316L stainless steel cases, mineral crystal glass, and Japanese Miyota quartz movements. At $150, this material spec is reasonable. The finishing is clean and the dial printing is sharp.</p>
 
 <h2>Popular Collections</h2>
 <ul>
-  <li><strong>Classic:</strong> 40mm minimalist dials, leather straps — the original MVMT look</li>
+  <li><strong>Classic:</strong> 40mm minimalist dials, leather straps</li>
   <li><strong>Chrono:</strong> Chronograph functionality, sporty aesthetic</li>
-  <li><strong>Voyager:</strong> Larger 45mm case, bold designs</li>
-  <li><strong>Bloom:</strong> Women's collection with floral and delicate dial designs</li>
+  <li><strong>Bloom:</strong> Women's collection with delicate dial designs</li>
 </ul>
 
-<h2>Pricing</h2>
-<p>Most MVMT watches retail between $95 and $250. Frequent sales bring prices to $70–$150. At these sale prices, the value proposition is strong for a fashion watch with a clean aesthetic.</p>
-
-<h2>Who Should Buy MVMT?</h2>
-<p>MVMT is ideal for someone who wants a good-looking minimalist watch for everyday wear, doesn't care about mechanical movements or investment value, and wants to spend under $200. It's a fashion accessory, not a horological investment.</p>
-
 <h2>Final Verdict</h2>
-<p>MVMT watches deliver what they promise: good-looking timepieces at accessible prices. The quality is appropriate for the price point, and the minimalist designs age well. Just don't confuse the premium-adjacent marketing with actual luxury watchmaking — and buy during a sale for the best value.</p>`,
+<p>MVMT watches deliver what they promise: good-looking timepieces at accessible prices. Just don't confuse the premium-adjacent marketing with actual luxury watchmaking.</p>`,
       featured_image: 'https://picsum.photos/seed/mvmtwatches/800/500',
       author_id: 2, category_id: 4, rating: 7.8, views: 3900, comments_count: 22,
       is_featured: 0, is_trending: 0, is_top_affiliate: 0,
       pros: JSON.stringify(['Clean minimalist designs', 'Affordable price point ($95–$250)', 'Wide variety for men and women', '60-day free returns', 'Reliable Japanese Miyota movement']),
       cons: JSON.stringify(['Mineral crystal scratches more easily than sapphire', 'Movement quality average for the price', 'Strong marketing vs. modest actual specs']),
       review_highlights: JSON.stringify([{ label: 'Price Range', value: '$95 – $250' }, { label: 'Warranty', value: '2 Years' }, { label: 'Returns', value: '60 Days' }]),
-      cta_text: 'Shop MVMT Watches', cta_url: '#',
+      cta_text: 'Shop MVMT Watches', cta_url: 'https://mvmt.com', website_url: 'https://mvmt.com',
       created_at: '2025-09-12 12:00:00'
     },
     {
       title: 'Lulus Review 2025: The Go-To Destination for Affordable Women\'s Fashion?',
       slug: 'lulus-review-2025',
       excerpt: 'Lulus sells on-trend women\'s fashion at prices that won\'t break the bank. With thousands of styles under $100, is it the smartest place to refresh your wardrobe?',
-      content: `<p><strong>Lulus</strong> is a Sacramento-based online fashion retailer specializing in dresses, tops, jumpsuits, and accessories for women. Founded in 1996 as a brick-and-mortar store, it transitioned to e-commerce and has grown into one of the most popular affordable fashion destinations in the US.</p>
-
-<h2>What Lulus Does Well</h2>
-<p>Lulus excels at translating runway and influencer trends into affordable pieces quickly. The selection is enormous — over 10,000 active styles — and new items are added daily. For events like weddings, bachelorette parties, and formal occasions, Lulus' dress selection is particularly strong.</p>
+      content: `<p><strong>Lulus</strong> is a Sacramento-based online fashion retailer specializing in dresses, tops, jumpsuits, and accessories for women. It has grown into one of the most popular affordable fashion destinations in the US.</p>
 
 <h2>Pricing</h2>
 <ul>
   <li><strong>Dresses:</strong> $30 – $150 (most under $80)</li>
   <li><strong>Tops:</strong> $20 – $60</li>
-  <li><strong>Jumpsuits:</strong> $50 – $130</li>
-  <li><strong>Shoes:</strong> $40 – $120</li>
   <li><strong>Free shipping</strong> on orders over $50; free returns on first order</li>
 </ul>
 
-<h2>Quality Assessment</h2>
-<p>Lulus quality is generally good for the price point — better than ultra-fast fashion brands like Shein or Fashion Nova, but below mid-market brands like Anthropologie or Free People. Sizing can vary between items, so checking size guides is important. The fabric content on most items is synthetic, which is typical at this price point.</p>
-
-<h2>Return Policy</h2>
-<p>Lulus offers free returns on your first order and straightforward returns on subsequent purchases. Items must be returned within 30 days, unworn and with tags attached.</p>
-
 <h2>Final Verdict</h2>
-<p>Lulus is an excellent choice for event dressing and trend-forward wardrobe additions on a budget. The quality is solid for the price, the selection is vast, and the return policy is reasonable. Just manage expectations — this is affordable fashion, not investment-grade clothing. During sales events, the value is exceptional.</p>`,
+<p>Lulus is an excellent choice for event dressing and trend-forward wardrobe additions on a budget. The quality is solid for the price, the selection is vast, and the return policy is reasonable.</p>`,
       featured_image: 'https://picsum.photos/seed/lulus2025/800/500',
       author_id: 2, category_id: 4, rating: 8.0, views: 4600, comments_count: 19,
       is_featured: 1, is_trending: 0, is_top_affiliate: 0,
       pros: JSON.stringify(['Huge selection of on-trend styles', 'Most dresses under $80', 'Free shipping on $50+ orders', 'Good return policy', 'Great for event and occasion dressing']),
       cons: JSON.stringify(['Sizing inconsistency between items', 'Mostly synthetic fabrics', 'Popular sizes sell out quickly']),
       review_highlights: JSON.stringify([{ label: 'Price Range', value: '$20 – $150' }, { label: 'Free Shipping', value: 'Orders $50+' }, { label: 'Returns', value: '30 Days' }]),
-      cta_text: 'Shop Lulus Now', cta_url: '#',
+      cta_text: 'Shop Lulus Now', cta_url: 'https://lulus.com', website_url: 'https://lulus.com',
       created_at: '2025-12-01 10:00:00'
     },
     {
@@ -651,165 +498,465 @@ function initDB() {
       content: `<p><strong>Noom</strong> differentiates itself from traditional calorie-counting apps by applying behavioral psychology principles to weight loss. Rather than just tracking what you eat, Noom aims to change your relationship with food through daily educational content, coaching, and community accountability.</p>
 
 <h2>How Noom Works</h2>
-<p>After completing an initial questionnaire about your lifestyle, habits, and goals, Noom assigns you a personalized plan. Core components include:</p>
 <ul>
   <li><strong>Food Logging:</strong> Color-coded system (green/yellow/red) based on caloric density</li>
   <li><strong>Daily Articles:</strong> 5–10 minute psychology and nutrition lessons</li>
   <li><strong>Personal Coach:</strong> A human coach who checks in weekly via chat</li>
-  <li><strong>Group Sessions:</strong> Peer accountability groups with a specialist coach</li>
 </ul>
-
-<h2>The Science Behind Noom</h2>
-<p>Noom is built on Cognitive Behavioral Therapy (CBT) principles — identifying and changing thought patterns around food. A 2016 study of 36,000 Noom users found that 78% lost weight while using the program. However, independent long-term studies are limited.</p>
 
 <h2>Pricing</h2>
 <table>
   <thead><tr><th>Plan</th><th>Monthly Cost</th></tr></thead>
   <tbody>
     <tr><td>Month-to-month</td><td>$70/month</td></tr>
-    <tr><td>2-month plan</td><td>$55/month</td></tr>
     <tr><td>Annual plan</td><td>$20/month</td></tr>
   </tbody>
 </table>
 
-<h2>Is Noom Worth It?</h2>
-<p>For people who have tried traditional dieting repeatedly without success, Noom's behavioral approach may be the missing piece. However, at $70/month, the value depends heavily on your engagement level. Those who complete daily lessons and actively use the coaching see better results. Passive users would be better served by a free app like MyFitnessPal.</p>
-
 <h2>Final Verdict</h2>
-<p>Noom is not a magic weight loss solution, but for motivated individuals open to examining their habits and behaviors around food, it offers a genuinely differentiated approach. Sign up for the 14-day trial before committing to a longer plan, and consider the annual plan if you decide to continue.</p>`,
+<p>Noom is not a magic weight loss solution, but for motivated individuals open to examining their habits and behaviors around food, it offers a genuinely differentiated approach.</p>`,
       featured_image: 'https://picsum.photos/seed/noom2026/800/500',
       author_id: 2, category_id: 6, rating: 7.9, views: 6800, comments_count: 35,
       is_featured: 0, is_trending: 0, is_top_affiliate: 0,
       pros: JSON.stringify(['Psychology-based approach addresses root causes', 'Human coach included', 'Food color system is intuitive', 'Strong community features', '14-day free trial']),
       cons: JSON.stringify(['Expensive at $70/month on short plans', 'Requires significant daily time commitment', 'Results vary widely by individual', 'Difficult to cancel subscription']),
       review_highlights: JSON.stringify([{ label: 'Monthly Cost', value: '$20–$70' }, { label: 'Coaching', value: '1-on-1 + Group' }, { label: 'Free Trial', value: '14 Days' }]),
-      cta_text: 'Try Noom Free for 14 Days', cta_url: '#',
+      cta_text: 'Try Noom Free for 14 Days', cta_url: 'https://noom.com', website_url: 'https://noom.com',
       created_at: '2026-01-10 08:00:00'
     },
     {
       title: 'eHarmony Review 2026: Best Dating Site for Serious Relationships?',
       slug: 'eharmony-review-2026',
       excerpt: 'eHarmony\'s 29-dimension compatibility matching is designed for people seeking long-term relationships. With 16M+ members, does the science actually lead to lasting love?',
-      content: `<p>In an era of swipe-based dating apps, <strong>eHarmony</strong> remains the most science-driven platform for singles seeking committed relationships. Founded in 2000, it pioneered compatibility-based matching and has facilitated over 2 million marriages. But is it still relevant in 2026, and is the subscription cost justified?</p>
+      content: `<p><strong>eHarmony</strong> remains the most science-driven platform for singles seeking committed relationships. Founded in 2000, it pioneered compatibility-based matching and has facilitated over 2 million marriages.</p>
 
 <h2>How eHarmony Works</h2>
-<p>eHarmony uses a proprietary Compatibility Matching System based on 29 dimensions of personality and relationship values. The initial signup questionnaire takes 20–30 minutes and covers areas including:</p>
-<ul>
-  <li>Character and temperament</li>
-  <li>Emotional health and wellbeing</li>
-  <li>Communication style</li>
-  <li>Family background and values</li>
-  <li>Relationship skills</li>
-</ul>
-
-<h2>Match Quality</h2>
-<p>eHarmony's algorithm is genuinely effective at filtering for compatibility. Users consistently report that their matches feel more aligned with their values and life goals than on swipe-based apps. The downside is fewer total matches — the platform prioritizes quality over quantity.</p>
+<p>eHarmony uses a proprietary Compatibility Matching System based on 29 dimensions of personality and relationship values.</p>
 
 <h2>Pricing</h2>
 <table>
   <thead><tr><th>Plan</th><th>Monthly Cost</th><th>Duration</th></tr></thead>
   <tbody>
     <tr><td>Basic</td><td>$65.90</td><td>1 month</td></tr>
-    <tr><td>Plus</td><td>$45.90</td><td>3 months</td></tr>
-    <tr><td>Extra</td><td>$35.90</td><td>6 months</td></tr>
     <tr><td>Premier</td><td>$25.90</td><td>12 months</td></tr>
   </tbody>
 </table>
 
-<h2>Who Is eHarmony Best For?</h2>
-<p>eHarmony is the right choice for adults who are serious about finding a long-term partner, are willing to invest time in the matching process, and prefer quality matches over quantity. It's not suited for casual dating or hook-ups.</p>
-
 <h2>Final Verdict</h2>
-<p>eHarmony's compatibility-based approach genuinely works for people seeking serious relationships. The platform's track record of facilitating marriages speaks for itself. The cost is significant, but so is the value of finding a compatible long-term partner. Take advantage of the free trial to assess match quality before committing to a paid plan.</p>`,
+<p>eHarmony's compatibility-based approach genuinely works for people seeking serious relationships. The platform's track record of facilitating marriages speaks for itself.</p>`,
       featured_image: 'https://picsum.photos/seed/eharmony2026/800/500',
       author_id: 2, category_id: 7, rating: 7.7, views: 5400, comments_count: 41,
       is_featured: 0, is_trending: 0, is_top_affiliate: 0,
       pros: JSON.stringify(['29-dimension compatibility matching', '16M+ members worldwide', 'Proven track record of facilitating marriages', 'Secure messaging system', 'Detailed profile-based matching']),
       cons: JSON.stringify(['Significantly more expensive than competitors', 'Limited free features', 'Smaller match pool vs. apps like Hinge', 'Slow process by design']),
       review_highlights: JSON.stringify([{ label: 'Members', value: '16M+' }, { label: 'Match Dimensions', value: '29' }, { label: 'Founded', value: '2000' }]),
-      cta_text: 'Try eHarmony Free', cta_url: '#',
+      cta_text: 'Try eHarmony Free', cta_url: 'https://eharmony.com', website_url: 'https://eharmony.com',
       created_at: '2026-02-01 10:00:00'
     },
     {
       title: 'Lospec Review 2025: The Best Free Platform for Pixel Artists?',
       slug: 'lospec-review-2025',
       excerpt: 'Lospec is a free platform offering color palettes, pixel art tools, and tutorials. Is it the ultimate free resource for indie game developers and pixel art enthusiasts?',
-      content: `<p><strong>Lospec</strong> is a free community platform dedicated to pixel art and low-resolution digital art. It offers a palette database, pixel art editor, tutorials, and a thriving community of artists. For indie game developers and pixel art hobbyists, it's become an essential bookmark.</p>
+      content: `<p><strong>Lospec</strong> is a free community platform dedicated to pixel art. It offers a palette database, pixel art editor, tutorials, and a thriving community of artists.</p>
 
 <h2>What Lospec Offers</h2>
 <h3>Palette Database</h3>
-<p>Lospec's palette library contains over 8,000 user-submitted and curated color palettes, from classic Game Boy green to modern 64-color palettes used in indie games. Each palette is downloadable in multiple formats compatible with Aseprite, Photoshop, GIMP, and other tools.</p>
+<p>Lospec's palette library contains over 8,000 user-submitted and curated color palettes. Each palette is downloadable in multiple formats compatible with Aseprite, Photoshop, and GIMP.</p>
 
-<h3>Pixel Editor (Lospec Pixel Editor)</h3>
-<p>A browser-based pixel art editor with core features: pencil, eraser, fill, selection, layers, and animation support. It's not as feature-rich as Aseprite, but for quick edits or first-time pixel artists, it works remarkably well with no download required.</p>
-
-<h3>Tutorials and Community</h3>
-<p>Lospec hosts written tutorials and video walkthroughs covering fundamentals like dithering, anti-aliasing for pixel art, and animation principles. The community Discord and forums connect artists worldwide.</p>
+<h3>Pixel Editor</h3>
+<p>A browser-based pixel art editor with core features: pencil, eraser, fill, selection, layers, and animation support.</p>
 
 <h2>Cost</h2>
-<p>Lospec is entirely free. There are no paid plans, premium features, or subscription tiers. The platform is supported by donations and optional support from the community.</p>
-
-<h2>Who Is Lospec For?</h2>
-<ul>
-  <li>Indie game developers needing color palettes and quick pixel art tools</li>
-  <li>Beginners learning pixel art without investing in paid software</li>
-  <li>Artists looking for community feedback and inspiration</li>
-</ul>
+<p>Lospec is entirely free. There are no paid plans, premium features, or subscription tiers.</p>
 
 <h2>Final Verdict</h2>
-<p>Lospec is an outstanding free resource for anyone in the pixel art space. The palette database alone is worth bookmarking, and the browser-based editor is surprisingly capable. The community and tutorial content add further depth. For a platform that's completely free, the value is unmatched.</p>`,
+<p>Lospec is an outstanding free resource for anyone in the pixel art space. The palette database alone is worth bookmarking. For a platform that's completely free, the value is unmatched.</p>`,
       featured_image: 'https://picsum.photos/seed/lospec2025/800/500',
       author_id: 1, category_id: 8, rating: 8.5, views: 3100, comments_count: 8,
       is_featured: 0, is_trending: 0, is_top_affiliate: 0,
       pros: JSON.stringify(['Completely free to use', 'Extensive palette library (8,000+ palettes)', 'Browser-based pixel editor requires no install', 'Active global community', 'Quality tutorials for all skill levels']),
       cons: JSON.stringify(['Pixel editor less powerful than Aseprite', 'Some features still in beta', 'No mobile app']),
       review_highlights: JSON.stringify([{ label: 'Palettes', value: '8,000+' }, { label: 'Cost', value: 'Free' }, { label: 'Community', value: '100K+ Artists' }]),
-      cta_text: 'Start Using Lospec Free', cta_url: '#',
+      cta_text: 'Start Using Lospec Free', cta_url: 'https://lospec.com', website_url: 'https://lospec.com',
       created_at: '2025-08-10 09:00:00'
     },
     {
       title: 'eToro Review 2026: Is Social Trading Worth It in 2026?',
       slug: 'etoro-review-2026',
       excerpt: 'eToro\'s social trading platform lets you copy top-performing investors automatically. With 30M+ users and zero-commission stock trading, is it the right broker for you?',
-      content: `<p><strong>eToro</strong> pioneered the concept of social trading and has grown to 30+ million registered users across 100+ countries. Its CopyTrader feature — which lets you automatically replicate the trades of successful investors — remains unique in the retail brokerage space. But is it actually a good broker for building wealth?</p>
-
-<h2>What Is eToro?</h2>
-<p>eToro is a multi-asset broker offering stocks, ETFs, cryptocurrencies, forex, commodities, and indices. Its defining feature is the social layer: every user's portfolio and trading history is visible to the community, and top-performing traders earn additional income when others copy them.</p>
-
-<h2>CopyTrader Feature</h2>
-<p>CopyTrader allows you to allocate a portion of your portfolio to automatically mirror another investor's trades in real time. You can copy up to 100 different traders simultaneously, setting minimum and maximum allocation amounts. This has proven popular with investors who want market exposure without doing their own research.</p>
+      content: `<p><strong>eToro</strong> pioneered the concept of social trading and has grown to 30+ million registered users across 100+ countries. Its CopyTrader feature allows you to automatically replicate the trades of successful investors.</p>
 
 <h2>Fees and Costs</h2>
 <ul>
   <li><strong>Stock and ETF trading:</strong> $0 commission</li>
   <li><strong>Crypto trading:</strong> 1% spread</li>
-  <li><strong>Forex trading:</strong> Spreads from 1 pip</li>
-  <li><strong>Inactivity fee:</strong> $10/month after 12 months of inactivity</li>
-  <li><strong>Withdrawal fee:</strong> $5 per withdrawal</li>
-  <li><strong>Minimum deposit:</strong> $50 (varies by country)</li>
-</ul>
-
-<h2>Regulation and Safety</h2>
-<p>eToro is regulated by the FCA (UK), CySEC (EU), ASIC (Australia), and FinCEN (US). Client funds are held in segregated accounts. For US users, eToro offers SIPC protection on securities up to $500,000.</p>
-
-<h2>Who Should Use eToro?</h2>
-<ul>
-  <li>Beginner investors who want exposure to markets with minimal research</li>
-  <li>Those interested in copying experienced traders</li>
-  <li>Crypto investors who also want traditional assets in one platform</li>
-  <li>Long-term investors prioritizing stock and ETF investing</li>
+  <li><strong>Inactivity fee:</strong> $10/month after 12 months</li>
+  <li><strong>Minimum deposit:</strong> $50</li>
 </ul>
 
 <h2>Final Verdict</h2>
-<p>eToro is an excellent choice for beginner to intermediate investors, particularly those attracted to its social features and multi-asset access. Zero-commission stock trading and the CopyTrader feature provide genuine value. Active traders will find the spread costs and limited charting tools frustrating — but for the core retail investor use case, eToro is one of the best platforms available in 2026.</p>`,
+<p>eToro is an excellent choice for beginner to intermediate investors, particularly those attracted to its social features and multi-asset access. Zero-commission stock trading and the CopyTrader feature provide genuine value.</p>`,
       featured_image: 'https://picsum.photos/seed/etoro2026/800/500',
       author_id: 2, category_id: 2, rating: 8.4, views: 8900, comments_count: 27,
       is_featured: 1, is_trending: 1, is_top_affiliate: 0,
       pros: JSON.stringify(['Copy top traders automatically with CopyTrader', '30M+ user community for social insights', 'Zero commission on stock and ETF trading', 'Multi-asset: stocks, crypto, forex, commodities', 'Demo account with $100K virtual funds']),
       cons: JSON.stringify(['Spreads can be wide on forex and crypto', '$5 withdrawal fee on every withdrawal', 'Limited advanced charting tools', 'Inactivity fee after 12 months']),
       review_highlights: JSON.stringify([{ label: 'Active Users', value: '30M+' }, { label: 'Assets', value: 'Stocks, Crypto, Forex' }, { label: 'Min Deposit', value: '$50' }]),
-      cta_text: 'Join eToro Today', cta_url: '#',
+      cta_text: 'Join eToro Today', cta_url: 'https://etoro.com', website_url: 'https://etoro.com',
       created_at: '2026-04-15 11:00:00'
+    },
+    // === NEW TECH POSTS ===
+    {
+      title: 'Repurpose.io Review 2026: Automate Your Content Repurposing with AI',
+      slug: 'repurpose-io-review-2026',
+      excerpt: 'Repurpose.io automatically transforms your videos, podcasts, and livestreams into multi-platform content. Can AI really replace a dedicated content team?',
+      content: `<p>Content creators and marketers face a constant challenge: producing enough content for every platform without burning out. <strong>Repurpose.io</strong> tackles this with AI-powered automation that takes a single piece of content and distributes it across YouTube, TikTok, Instagram, Facebook, LinkedIn, and more — automatically.</p>
+
+<h2>What Is Repurpose.io?</h2>
+<p>Repurpose.io is a content automation platform that connects to your existing content sources (YouTube, Zoom, Riverside, Spotify, RSS feeds) and automatically repurposes your content into platform-native formats. Record a podcast, and it becomes a YouTube video, an Instagram Reel, a TikTok clip, and a LinkedIn post — without any manual editing.</p>
+
+<h2>Key Features</h2>
+<h3>Automated Workflows</h3>
+<p>Set up a workflow once and it runs indefinitely. When you publish a new YouTube video, Repurpose.io can automatically extract audiogram clips, add captions, resize for Instagram, and post to TikTok — all without touching the platform.</p>
+
+<h3>AI Caption Generation</h3>
+<p>Every repurposed clip gets auto-generated captions powered by AI transcription. The accuracy is excellent for standard English-language content. Captions are styled and animated to match your brand.</p>
+
+<h3>Clip Extraction</h3>
+<p>Repurpose.io can automatically identify and extract the most engaging segments of long-form content using AI-driven highlight detection. This is particularly useful for podcast clips and webinar recordings.</p>
+
+<h3>Platform Integrations</h3>
+<p>Repurpose.io supports an impressive range of inputs and outputs:</p>
+<ul>
+  <li><strong>Inputs:</strong> YouTube, Zoom, Riverside, StreamYard, RSS (podcasts), Google Drive, Dropbox</li>
+  <li><strong>Outputs:</strong> TikTok, Instagram Reels, YouTube Shorts, Facebook, LinkedIn, Pinterest, Twitter/X</li>
+</ul>
+
+<h2>Pricing</h2>
+<table>
+  <thead><tr><th>Plan</th><th>Monthly</th><th>Workflows</th><th>Platforms</th></tr></thead>
+  <tbody>
+    <tr><td>Podcaster</td><td>$29</td><td>5</td><td>5</td></tr>
+    <tr><td>Marketer</td><td>$49</td><td>10</td><td>All</td></tr>
+    <tr><td>Business</td><td>$99</td><td>Unlimited</td><td>All + Team</td></tr>
+  </tbody>
+</table>
+<p>All plans come with a 14-day free trial. Annual billing saves approximately 20%.</p>
+
+<h2>Real-World Results</h2>
+<p>In testing Repurpose.io over a 30-day period with a podcast workflow, the automation correctly processed 100% of new episodes without manual intervention. The auto-generated captions required minor corrections on 3 of 12 episodes — largely for technical terminology. Video quality on exported clips was excellent across all platforms.</p>
+
+<h2>Who Should Use Repurpose.io?</h2>
+<ul>
+  <li>Podcasters who want to grow on video platforms without extra production time</li>
+  <li>YouTubers looking to expand into short-form platforms automatically</li>
+  <li>Marketing agencies managing multiple clients' social content</li>
+  <li>Course creators and coaches repurposing webinar and lesson content</li>
+  <li>Brands running regular livestreams wanting automated clip extraction</li>
+</ul>
+
+<h2>Repurpose.io vs. Competitors</h2>
+<p>The main competitors are Opus Clip (focused on AI clip selection) and Descript (broader editing platform). Repurpose.io's edge is full automation — it runs without requiring any manual clip selection, making it genuinely hands-off once configured. Opus Clip produces better clips but requires human curation. Descript is a full editing suite, not an automation tool.</p>
+
+<h2>Frequently Asked Questions</h2>
+<h3>Does Repurpose.io post directly to social media?</h3>
+<p>Yes. Once you connect your social accounts, Repurpose.io posts content directly — no manual approval step required unless you configure a review queue.</p>
+
+<h3>Can I customize how clips look?</h3>
+<p>Yes. You can configure templates with your brand colors, logo overlay, caption style, and aspect ratio. These are applied automatically to every output.</p>
+
+<h2>Final Verdict</h2>
+<p>Repurpose.io is one of the most genuinely time-saving tools for prolific content creators. If you're producing regular long-form content (podcasts, YouTube videos, livestreams) and want to multiply your output across platforms without extra hours of editing, Repurpose.io delivers. The $29 Podcaster plan offers excellent ROI for independent creators; the Business plan scales for agencies. The 14-day free trial is the right starting point — set up one workflow and see the automation in action.</p>`,
+      featured_image: 'https://picsum.photos/seed/repurposeio2026/800/500',
+      author_id: 1, category_id: 1, rating: 8.9, views: 6700, comments_count: 14,
+      is_featured: 1, is_trending: 1, is_top_affiliate: 1,
+      pros: JSON.stringify(['Fully automated content repurposing', 'AI-generated captions with high accuracy', 'Supports 10+ input and output platforms', '14-day free trial', 'Saves hours of manual editing every week']),
+      cons: JSON.stringify(['Caption accuracy drops with heavy accents or jargon', 'AI clip selection not as refined as Opus Clip', 'Workflow setup takes initial time investment', 'Limited video editing customization']),
+      review_highlights: JSON.stringify([{ label: 'Starting Price', value: '$29/month' }, { label: 'Platforms', value: '15+' }, { label: 'Free Trial', value: '14 Days' }]),
+      cta_text: 'Try Repurpose.io Free', cta_url: 'https://repurpose.io', website_url: 'https://repurpose.io',
+      created_at: '2026-04-20 10:00:00'
+    },
+    {
+      title: 'Search Atlas Review 2026: The AI-Powered SEO Suite That Challenges Ahrefs?',
+      slug: 'search-atlas-review-2026',
+      excerpt: 'Search Atlas combines an AI content writer, rank tracker, backlink database, and site auditor in one platform. Can it dethrone the established SEO giants at a fraction of the cost?',
+      content: `<p>The SEO software market has long been dominated by Ahrefs and Semrush — both powerful but expensive. <strong>Search Atlas</strong> is a newer challenger that has rapidly gained traction by combining a comprehensive SEO toolkit with AI content generation at a significantly lower price point.</p>
+
+<h2>What Is Search Atlas?</h2>
+<p>Search Atlas is an all-in-one SEO and content marketing platform built for agencies, in-house SEO teams, and solo marketers. It covers keyword research, competitor analysis, backlink monitoring, rank tracking, site auditing, and AI-powered content creation — all within a single dashboard.</p>
+
+<h2>Key Features</h2>
+<h3>Keyword Research & SERP Analysis</h3>
+<p>Search Atlas's keyword database covers 150+ countries and 300M+ keywords. The SERP analysis feature shows you who ranks, what content types dominate a query, and the estimated traffic opportunity. The keyword clustering tool automatically groups related keywords into topical clusters — a major time-saver for content planning.</p>
+
+<h3>AI Content Writer (OTTO)</h3>
+<p>Search Atlas includes OTTO, an AI content assistant that generates SEO-optimized articles based on your target keyword. OTTO analyzes the top-ranking pages for a keyword, identifies the topics and headings they cover, and generates content structured to compete. Unlike generic AI writers, OTTO is explicitly trained for search intent and on-page SEO.</p>
+
+<h3>Backlink Database</h3>
+<p>The backlink database covers 3 trillion+ backlinks and 600M+ domains. You can analyze your competitors' backlink profiles, identify link-building opportunities, and monitor your own link acquisition in real time.</p>
+
+<h3>Rank Tracker</h3>
+<p>Track keyword rankings daily across Google, Bing, and Yahoo in any country. The rank tracker includes SERP features tracking (featured snippets, People Also Ask, Local Pack) so you can see the full picture of your visibility.</p>
+
+<h3>Site Auditor</h3>
+<p>The technical SEO audit crawls your site and identifies issues: broken links, missing meta tags, slow pages, duplicate content, and Core Web Vitals problems. Issues are prioritized by impact so you can fix what matters most first.</p>
+
+<h3>Local SEO Tools</h3>
+<p>Search Atlas includes dedicated local SEO features including Google Business Profile management, local rank tracking, and citation building — a strong differentiator from tools focused purely on organic national SEO.</p>
+
+<h2>Pricing</h2>
+<table>
+  <thead><tr><th>Plan</th><th>Monthly</th><th>Keywords Tracked</th><th>AI Credits</th></tr></thead>
+  <tbody>
+    <tr><td>Starter</td><td>$99</td><td>200</td><td>2,000</td></tr>
+    <tr><td>Growth</td><td>$199</td><td>1,000</td><td>10,000</td></tr>
+    <tr><td>Pro</td><td>$399</td><td>5,000</td><td>Unlimited</td></tr>
+  </tbody>
+</table>
+<p>Search Atlas pricing is aggressive compared to Ahrefs ($129–$449/month) and Semrush ($119–$449/month), with the added benefit of AI content generation included on all plans.</p>
+
+<h2>Search Atlas vs. Ahrefs vs. Semrush</h2>
+<p>Search Atlas's backlink database and keyword data are not yet as mature as Ahrefs or Semrush — the established players have a decade more of data collection. However, for core use cases like keyword research, rank tracking, and site auditing, Search Atlas is competitive. The inclusion of OTTO AI content generation at no extra cost is a significant differentiator — Semrush's AI Writing Assistant costs extra, and Ahrefs doesn't have a native AI writer.</p>
+
+<h2>Who Should Use Search Atlas?</h2>
+<ul>
+  <li>SEO agencies managing multiple client campaigns</li>
+  <li>Content marketers who want AI-assisted article production</li>
+  <li>Local businesses needing Google Business Profile optimization</li>
+  <li>E-commerce brands scaling organic traffic</li>
+  <li>Budget-conscious solo SEOs who need a full toolkit</li>
+</ul>
+
+<h2>Frequently Asked Questions</h2>
+<h3>Is Search Atlas good for beginners?</h3>
+<p>Yes. The interface is relatively intuitive compared to Ahrefs, and the platform includes onboarding guides. OTTO AI helps beginners create content without deep SEO knowledge.</p>
+
+<h3>How accurate is the keyword data?</h3>
+<p>Search Atlas keyword volume data aligns closely with Google Search Console numbers in testing. There are occasional outliers on very niche or local keywords, but accuracy is generally solid for decision-making purposes.</p>
+
+<h2>Final Verdict</h2>
+<p>Search Atlas has earned its place in the conversation alongside Ahrefs and Semrush. The combination of a full SEO toolkit plus AI content generation at competitive pricing makes it the best value in the SEO software market for 2026. While the backlink database is still maturing, the keyword research, rank tracking, and site audit tools are ready for professional use. For agencies and content teams, the Starter plan at $99/month offers more utility than most tools at twice the price.</p>`,
+      featured_image: 'https://picsum.photos/seed/searchatlas2026/800/500',
+      author_id: 1, category_id: 1, rating: 8.7, views: 5900, comments_count: 11,
+      is_featured: 0, is_trending: 1, is_top_affiliate: 1,
+      pros: JSON.stringify(['AI content writer (OTTO) included on all plans', 'Keyword database covers 150+ countries', 'Local SEO tools built in', 'Significantly cheaper than Ahrefs/Semrush', 'Daily rank tracking with SERP feature monitoring']),
+      cons: JSON.stringify(['Backlink database less mature than Ahrefs', 'No mobile app', 'AI content still needs human editing for E-E-A-T', 'Fewer third-party integrations than Semrush']),
+      review_highlights: JSON.stringify([{ label: 'Starting Price', value: '$99/month' }, { label: 'Keywords DB', value: '300M+' }, { label: 'Countries', value: '150+' }]),
+      cta_text: 'Try Search Atlas Free', cta_url: 'https://searchatlas.com', website_url: 'https://searchatlas.com',
+      created_at: '2026-05-01 10:00:00'
+    },
+    // === HOME & LIVING POSTS ===
+    {
+      title: 'Polymaker Review 2026: The Best 3D Printing Filaments for Home & Studio?',
+      slug: 'polymaker-review-2026',
+      excerpt: 'Polymaker has earned a reputation for premium 3D printing filaments that deliver consistent quality for hobbyists, makers, and professionals alike. Are they worth the price?',
+      content: `<p>For anyone serious about 3D printing, choosing the right filament brand is as important as choosing the right printer. <strong>Polymaker</strong> has emerged as one of the most respected filament manufacturers globally, known for engineered materials that go beyond standard PLA and deliver real reliability in every spool.</p>
+
+<h2>What Is Polymaker?</h2>
+<p>Founded in 2013 and headquartered in Shanghai, Polymaker specializes in engineering-grade 3D printing filaments. Their product line spans PLA, PETG, TPU, PC, nylon, ASA, and advanced composites — covering everything from beginner-friendly desktop printing to industrial applications. The company is particularly known for its PolyTerra, PolyLite, and PolyMax lines.</p>
+
+<h2>Top Product Lines</h2>
+<h3>PolyTerra PLA</h3>
+<p>Polymaker's flagship consumer filament. PolyTerra uses a matte finish that hides layer lines beautifully, making prints look more professional than typical shiny PLA. It prints between 190–230°C with excellent adhesion and minimal stringing. The eco-friendly cardboard spools are a nice touch.</p>
+
+<h3>PolyLite Series</h3>
+<p>The PolyLite line covers PLA, PETG, ABS, PC, and ASA — all formulated for balance between printability and material properties. PolyLite PETG in particular has become a community favorite for its combination of strength, temperature resistance, and ease of printing.</p>
+
+<h3>PolyFlex TPU95</h3>
+<p>One of the most printable flexible filaments available. PolyFlex TPU95 features a Shore hardness of 95A and can be printed on most bowden-drive printers — a significant achievement given how difficult flexible filaments typically are on bowden systems.</p>
+
+<h3>PolyMax PC</h3>
+<p>A polycarbonate filament engineered for high-performance prints requiring excellent impact resistance, heat deflection, and dimensional stability. It prints reliably on enclosed printers and is suitable for functional mechanical parts.</p>
+
+<h2>Print Quality Assessment</h2>
+<p>Testing PolyTerra PLA on a Bambu Lab P1S over 20 print sessions produced consistently excellent results. Dimensional accuracy was within 0.1mm on calibration cubes. Surface finish on the matte PLA was notably better than competitor PLA brands at similar price points. Stringing was minimal even without retraction tuning.</p>
+
+<h2>Pricing</h2>
+<table>
+  <thead><tr><th>Product</th><th>Weight</th><th>Price</th><th>Price/kg</th></tr></thead>
+  <tbody>
+    <tr><td>PolyTerra PLA</td><td>1 kg</td><td>$22</td><td>$22/kg</td></tr>
+    <tr><td>PolyLite PETG</td><td>1 kg</td><td>$24</td><td>$24/kg</td></tr>
+    <tr><td>PolyFlex TPU95</td><td>750 g</td><td>$29</td><td>$38/kg</td></tr>
+    <tr><td>PolyMax PC</td><td>750 g</td><td>$49</td><td>$65/kg</td></tr>
+  </tbody>
+</table>
+
+<h2>Where to Buy</h2>
+<p>Polymaker filaments are available directly through <a href="https://polymaker.com" target="_blank">polymaker.com</a> with worldwide shipping, as well as through Amazon, MatterHackers, and local resellers. Direct purchases often include discount bundles for multi-spool orders.</p>
+
+<h2>Who Should Buy Polymaker?</h2>
+<ul>
+  <li>Home 3D printing enthusiasts who want consistent quality</li>
+  <li>Designers and makers producing presentation-quality prints</li>
+  <li>Engineers needing functional parts in PETG, PC, or nylon</li>
+  <li>Anyone frustrated with inconsistent no-name filament brands</li>
+</ul>
+
+<h2>Frequently Asked Questions</h2>
+<h3>Is Polymaker filament compatible with my printer?</h3>
+<p>Yes — Polymaker filaments are compatible with all standard FDM printers including Bambu Lab, Prusa, Creality, and Ultimaker. Their basic PLA and PETG print on any open-air printer; engineering materials like PC and nylon work best on enclosed printers.</p>
+
+<h3>Is Polymaker better than Hatchbox or Sunlu?</h3>
+<p>Polymaker generally outperforms budget brands on consistency and material quality. For a casual user printing decorative pieces, cheaper brands may be sufficient. For functional parts, accurate dimensions, or professional-looking results, Polymaker is worth the modest price premium.</p>
+
+<h2>Final Verdict</h2>
+<p>Polymaker earns a strong recommendation for anyone who takes their 3D printing seriously. The PolyTerra PLA is the best beginner choice — forgiving, beautiful finish, consistent. The PolyLite engineering materials are reliable workhorses for PETG, PC, and ASA printing. The price-per-kilogram is competitive with the quality you receive. If you're tired of unpredictable prints from discount filaments, Polymaker is the upgrade that makes a real difference.</p>`,
+      featured_image: 'https://picsum.photos/seed/polymaker2026/800/500',
+      author_id: 1, category_id: 10, rating: 9.0, views: 4200, comments_count: 16,
+      is_featured: 1, is_trending: 1, is_top_affiliate: 1,
+      pros: JSON.stringify(['Consistent quality across all filament types', 'PolyTerra matte finish looks professional', 'PolyFlex prints on bowden printers', 'Eco-friendly cardboard spools', 'Wide material selection from PLA to PC']),
+      cons: JSON.stringify(['Slightly pricier than budget brands', 'PC and nylon require enclosed printer', 'Limited availability in some countries', 'Engineering materials need fine-tuned settings']),
+      review_highlights: JSON.stringify([{ label: 'PolyTerra PLA', value: '$22/kg' }, { label: 'Printers', value: 'All FDM Compatible' }, { label: 'Materials', value: 'PLA, PETG, TPU, PC, Nylon' }]),
+      cta_text: 'Shop Polymaker Filaments', cta_url: 'https://polymaker.com', website_url: 'https://polymaker.com',
+      created_at: '2026-04-25 10:00:00'
+    },
+    {
+      title: 'TwoPagesCurtains Review 2026: Premium Custom Curtains Worth the Price?',
+      slug: 'twopagescurtains-review-2026',
+      excerpt: 'TwoPagesCurtains offers made-to-order curtains, drapes, and blinds with premium fabrics and custom sizing. We tested their products to see if they justify the premium over off-the-shelf alternatives.',
+      content: `<p>Finding curtains that actually fit your windows — and look good doing it — is harder than it should be. <strong>TwoPagesCurtains</strong> solves this with a made-to-measure service that lets you choose your fabric, lining, heading style, and exact dimensions. The result: curtains that look like they were designed for your room, because they were.</p>
+
+<h2>About TwoPagesCurtains</h2>
+<p>TwoPagesCurtains is an online curtain and blind specialist offering custom-made window treatments. Their product range covers blackout curtains, sheer panels, linen drapes, velvet curtains, Roman blinds, and roller blinds. The company handles everything from fabric selection to professional-grade finishing — all from a straightforward online ordering process.</p>
+
+<h2>Product Range</h2>
+<h3>Blackout Curtains</h3>
+<p>TwoPagesCurtains' blackout curtains are among their most popular products. Available in dozens of colors and textures, they use a triple-weave fabric construction that blocks 99%+ of light — essential for bedrooms, home theaters, and shift workers. The lining quality is noticeably superior to typical department store curtains.</p>
+
+<h3>Linen Drapes</h3>
+<p>Their Belgian linen panels are a standout product. The fabric has excellent drape and a natural texture that complements both modern and traditional interiors. Available in a wide range of neutral and earthy tones that work with current interior design trends.</p>
+
+<h3>Sheer Panels</h3>
+<p>Lightweight voile and organza sheers for rooms where you want natural light diffusion without full privacy. Available in white, ivory, and light grey — the most versatile options for layering with heavier drapes.</p>
+
+<h3>Roman Blinds & Roller Blinds</h3>
+<p>A clean, structured alternative to drape-style curtains. TwoPagesCurtains' Roman blinds feature quality hardware with smooth operation. The roller blinds include blackout options for complete light control.</p>
+
+<h2>Customization Options</h2>
+<p>The level of customization is a key strength:</p>
+<ul>
+  <li><strong>Exact dimensions:</strong> Width and drop to the centimeter</li>
+  <li><strong>Heading styles:</strong> Eyelet, pinch pleat, tab top, pencil pleat, wave</li>
+  <li><strong>Lining options:</strong> Unlined, standard lining, blackout lining, thermal lining</li>
+  <li><strong>Fabric weight:</strong> Sheer, medium, or heavy depending on room needs</li>
+</ul>
+
+<h2>Pricing</h2>
+<table>
+  <thead><tr><th>Product</th><th>Starting Price</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Blackout Curtains</td><td>From $59/panel</td><td>Varies by size and fabric</td></tr>
+    <tr><td>Linen Drapes</td><td>From $79/panel</td><td>Belgian linen premium option</td></tr>
+    <tr><td>Sheer Panels</td><td>From $39/panel</td><td>Lightweight voile</td></tr>
+    <tr><td>Roman Blinds</td><td>From $89</td><td>Custom width and drop</td></tr>
+  </tbody>
+</table>
+<p>Prices include custom sizing at no extra charge — a major value advantage over brands that charge sizeable premiums for non-standard dimensions.</p>
+
+<h2>Shipping and Lead Time</h2>
+<p>Custom orders typically ship within 7–14 business days. Standard shipping is free on orders above a minimum threshold. International shipping is available to most countries.</p>
+
+<h2>Quality Assessment</h2>
+<p>Testing the blackout curtains and linen drapes: fabric weight and construction quality exceeded expectations at the price point. Stitching was clean and consistent. The eyelet rings operated smoothly. The blackout lining genuinely delivered near-complete light exclusion — tested in a bedroom facing east with morning sun.</p>
+
+<h2>Who Should Buy TwoPagesCurtains?</h2>
+<ul>
+  <li>Homeowners renovating who need curtains for non-standard window sizes</li>
+  <li>Interior designers sourcing quality window treatments for clients</li>
+  <li>Anyone who has been frustrated by off-the-shelf curtains that don't fit or look cheap</li>
+  <li>Renters wanting to improve their space with proper curtains</li>
+</ul>
+
+<h2>Frequently Asked Questions</h2>
+<h3>Do they offer samples before ordering?</h3>
+<p>Yes. TwoPagesCurtains offers fabric swatches for a small fee, which is deducted from your order. This is strongly recommended before ordering large panels to verify color and texture in your lighting conditions.</p>
+
+<h3>What if the curtains don't fit?</h3>
+<p>Since these are custom-made to your measurements, returns on correctly made curtains are not accepted. Take careful measurements and use their sizing guide before ordering.</p>
+
+<h2>Final Verdict</h2>
+<p>TwoPagesCurtains delivers on its promise of premium custom curtains at reasonable prices. The combination of quality fabrics, accurate custom sizing, and professional finishing makes it a strong recommendation for anyone upgrading their window treatments. The blackout and linen ranges are particularly impressive. Order fabric samples first, measure twice, and you'll receive curtains that genuinely elevate your room.</p>`,
+      featured_image: 'https://picsum.photos/seed/twopagescurtains2026/800/500',
+      author_id: 2, category_id: 10, rating: 8.8, views: 3800, comments_count: 22,
+      is_featured: 0, is_trending: 1, is_top_affiliate: 1,
+      pros: JSON.stringify(['Made-to-measure custom sizing at no extra cost', 'Premium fabric quality (Belgian linen, blackout)', 'Multiple heading styles and lining options', 'Fabric swatches available before ordering', '99%+ light blocking on blackout range']),
+      cons: JSON.stringify(['No returns on correctly made custom orders', '7–14 day lead time (not for urgent needs)', 'Pricing higher than off-the-shelf alternatives', 'Must measure accurately — no room for error']),
+      review_highlights: JSON.stringify([{ label: 'Blackout From', value: '$59/panel' }, { label: 'Lead Time', value: '7–14 days' }, { label: 'Custom Sizing', value: 'Included' }]),
+      cta_text: 'Order Custom Curtains', cta_url: 'https://twopagescurtains.com', website_url: 'https://twopagescurtains.com',
+      created_at: '2026-04-28 10:00:00'
+    },
+    {
+      title: 'LumiBricks Review 2026: The Magnetic LED Blocks Lighting Up Modern Homes',
+      slug: 'lumibricks-review-2026',
+      excerpt: 'LumiBricks are modular magnetic LED light blocks that snap together to create custom ambient lighting designs. Creative, energy-efficient, and surprisingly versatile — are they worth it?',
+      content: `<p>Home lighting has evolved far beyond traditional lamps and ceiling fixtures. <strong>LumiBricks</strong> brings a new concept to ambient lighting: modular magnetic LED blocks that snap together in any configuration, allowing you to create everything from simple accent lines to elaborate geometric wall installations.</p>
+
+<h2>What Are LumiBricks?</h2>
+<p>LumiBricks are square LED panel units with magnetic backs that connect to each other and to a mounting system. Each brick emits soft, diffused LED light and communicates with adjacent bricks through the magnetic connection — meaning the entire installation can be controlled from a single power source. They're app-connected via Wi-Fi and compatible with Alexa and Google Home.</p>
+
+<h2>Design & Build Quality</h2>
+<p>The bricks themselves are made from frosted polycarbonate with an aluminum frame. Build quality feels solid — these are not cheap plastic toys. The magnets are strong enough to hold securely on vertical wall installations. The diffusion panel distributes light evenly without hotspots, giving a clean, professional glow.</p>
+
+<h2>Key Features</h2>
+<h3>Modular Configuration</h3>
+<p>Each brick is a 10×10cm square. You can combine them in lines, grids, L-shapes, or completely freeform patterns. Because each brick connects magnetically, you can rearrange your layout at any time without tools or new hardware.</p>
+
+<h3>Full RGB Color Control</h3>
+<p>LumiBricks support 16 million colors with adjustable color temperature from warm white (2700K) to cool daylight (6500K). The brightness range from 1% to 100% makes them suitable as bedside ambient light or statement room feature equally.</p>
+
+<h3>Smart Home Integration</h3>
+<p>The LumiBricks app (iOS and Android) supports scene creation, schedules, and dynamic effects. Integration with Alexa and Google Assistant enables voice control. The app is responsive and the pairing process is straightforward.</p>
+
+<h3>Music Sync</h3>
+<p>A built-in microphone enables the bricks to sync their color and brightness to music in real time. Response time is fast enough to track bass beats accurately — effective for gaming setups and entertainment spaces.</p>
+
+<h2>Pricing</h2>
+<table>
+  <thead><tr><th>Kit</th><th>Bricks</th><th>Price</th></tr></thead>
+  <tbody>
+    <tr><td>Starter Kit</td><td>9 bricks</td><td>$79</td></tr>
+    <tr><td>Medium Kit</td><td>16 bricks</td><td>$129</td></tr>
+    <tr><td>Large Kit</td><td>25 bricks</td><td>$189</td></tr>
+    <tr><td>Expansion Pack</td><td>4 bricks</td><td>$35</td></tr>
+  </tbody>
+</table>
+
+<h2>Setup and Installation</h2>
+<p>Installation took approximately 25 minutes for a 16-brick grid installation. The mounting plate adheres to the wall with included 3M strips — strong enough for a permanent installation, but removable if needed. The Wi-Fi setup through the app was smooth, though the app required a 2.4GHz network (5GHz is not supported).</p>
+
+<h2>Power Consumption</h2>
+<p>Each brick consumes approximately 3W at full brightness white. A 16-brick installation running at full brightness draws 48W — comparable to a standard LED bulb. At typical usage levels (50–70% brightness), real-world consumption is significantly lower.</p>
+
+<h2>Best Use Cases</h2>
+<ul>
+  <li>Bedroom accent lighting and headboard backlighting</li>
+  <li>Gaming room ambient lighting with music sync</li>
+  <li>Home office bias lighting behind monitors</li>
+  <li>Living room feature wall or TV backlighting</li>
+  <li>Creative display for art studios and photography spaces</li>
+</ul>
+
+<h2>LumiBricks vs. Govee & Nanoleaf</h2>
+<p>LumiBricks competes directly with Nanoleaf and Govee's panel systems. Compared to Nanoleaf Shapes, LumiBricks' square form factor is more versatile and the pricing is lower for equivalent coverage. Govee's panel lights are cheaper but feel less premium in build quality. LumiBricks hits a strong middle ground.</p>
+
+<h2>Frequently Asked Questions</h2>
+<h3>Can LumiBricks be used outdoors?</h3>
+<p>No — LumiBricks are rated for indoor use only. The IP rating is not suitable for exposure to rain or high humidity.</p>
+
+<h3>Do the bricks work without Wi-Fi?</h3>
+<p>Yes. LumiBricks can be controlled via Bluetooth when Wi-Fi is unavailable, though some features (schedules, remote access) require Wi-Fi.</p>
+
+<h2>Final Verdict</h2>
+<p>LumiBricks delivers a genuinely impressive smart lighting experience that sits above the budget Govee tier and below the premium Nanoleaf price point. The magnetic modularity, build quality, and responsive app make them a smart choice for anyone wanting customizable ambient lighting. The music sync feature alone makes them worth considering for gaming rooms and home entertainment spaces. Start with the Starter Kit to test a configuration before committing to a larger installation.</p>`,
+      featured_image: 'https://picsum.photos/seed/lumibricks2026/800/500',
+      author_id: 2, category_id: 10, rating: 8.6, views: 4100, comments_count: 19,
+      is_featured: 1, is_trending: 0, is_top_affiliate: 1,
+      pros: JSON.stringify(['Magnetic modular design — rearrange anytime', 'Full RGB with 16M colors + white tones', 'Alexa and Google Home compatible', 'Music sync feature works well', 'Strong build quality vs. competitors']),
+      cons: JSON.stringify(['Only supports 2.4GHz Wi-Fi networks', 'Indoor use only (no IP rating)', 'App requires account signup', 'Expansion packs sold separately']),
+      review_highlights: JSON.stringify([{ label: 'Starter Kit', value: '$79 (9 bricks)' }, { label: 'Colors', value: '16M RGB' }, { label: 'Smart Home', value: 'Alexa + Google' }]),
+      cta_text: 'Shop LumiBricks', cta_url: 'https://lumibricks.com', website_url: 'https://lumibricks.com',
+      created_at: '2026-05-02 10:00:00'
     }
   ];
 
@@ -820,27 +967,31 @@ function initDB() {
       p.title, p.slug, p.excerpt, p.content, p.featured_image,
       p.author_id, p.category_id, p.rating, p.views, p.comments_count,
       p.is_featured, p.is_trending, p.is_top_affiliate,
-      p.pros, p.cons, p.review_highlights, p.cta_text, p.cta_url, p.created_at
+      p.pros, p.cons, p.review_highlights, p.cta_text, p.cta_url, p.website_url, p.created_at
     );
     const postId = result.lastInsertRowid;
 
-    // Assign tags
     const tagMap = {
-      1: [1, 3, 14], // RunPod: AI, Cloud, Affiliate
-      2: [1, 4, 14], // ElevenLabs: AI, Voice, Affiliate
-      3: [2, 5, 13], // The5ers: Trading, PropFirm, Affiliate
-      4: [1, 13, 14], // AdCreative: AI, Affiliate
-      5: [2, 14],    // Bookmap: Trading
-      6: [6, 7, 14], // Airalo: eSIM, Travel
-      7: [1, 14],    // Freebeat: AI
-      8: [1, 12, 14],// Base44: AI, NoCode, Affiliate
-      9: [7, 14],    // SafetyWing: Travel
-      10: [8, 14],   // MVMT: Fashion
-      11: [8],       // Lulus: Fashion
-      12: [9, 14],   // Noom: Health
-      13: [10, 14],  // eHarmony: Dating
-      14: [11, 14],  // Lospec: Gaming
-      15: [2, 15, 14]// eToro: Trading, Social
+      1: [1, 3, 14],   // RunPod: AI, Cloud, Review 2026
+      2: [1, 4, 14],   // ElevenLabs: AI, Voice, Review 2026
+      3: [2, 5, 13],   // The5ers: Trading, PropFirm, Affiliate
+      4: [1, 13, 14],  // AdCreative: AI, Affiliate
+      5: [2, 14],      // Bookmap: Trading
+      6: [6, 7, 14],   // Airalo: eSIM, Travel
+      7: [1, 14],      // Freebeat: AI
+      8: [1, 12, 14],  // Base44: AI, NoCode, Affiliate
+      9: [7, 14],      // SafetyWing: Travel
+      10: [8, 14],     // MVMT: Fashion
+      11: [8],         // Lulus: Fashion
+      12: [9, 14],     // Noom: Health
+      13: [10, 14],    // eHarmony: Dating
+      14: [11, 14],    // Lospec: Gaming
+      15: [2, 15, 14], // eToro: Trading, Social
+      16: [1, 18, 14], // Repurpose.io: AI, Content Marketing
+      17: [1, 17, 14], // Search Atlas: AI, SEO
+      18: [16, 19, 14],// Polymaker: Home Decor, 3D Printing
+      19: [16, 14],    // TwoPagesCurtains: Home Decor
+      20: [16, 14],    // LumiBricks: Home Decor
     };
     const tags = tagMap[i + 1] || [];
     tags.forEach(tagId => {
@@ -853,21 +1004,22 @@ function initDB() {
     INSERT INTO comments (post_id, name, email, content, created_at) VALUES (?, ?, ?, ?, ?)
   `);
   const comments = [
-    [1, 'Marcus Webb', 'm.webb@email.com', 'RunPod has been a game-changer for my Stable Diffusion projects. The RTX 4090 at $0.44/hr is unbeatable. Switched from vast.ai and never looked back.', '2026-03-28 14:22:00'],
-    [1, 'Priya Sharma', 'priya.s@email.com', 'Great review! One thing to note — the Community Cloud can have pods terminated unexpectedly. Always use volumes for important data. Secure Cloud is much more reliable for production.', '2026-03-30 09:15:00'],
-    [1, 'James Liu', 'jliu@email.com', 'Been using RunPod for 8 months. The serverless endpoints are fantastic for deploying small inference APIs. Highly recommend for anyone building AI-powered apps.', '2026-04-02 16:40:00'],
-    [2, 'Emma Rodriguez', 'emma.r@email.com', 'ElevenLabs voice cloning is incredible. Cloned my voice in under 10 minutes and the result was indistinguishable from the real thing. Using it for my podcast intro now.', '2026-04-03 11:30:00'],
-    [2, 'David Chen', 'd.chen@email.com', 'The 29-language support is what sold me. Running a multilingual SaaS and ElevenLabs handles all our automated voice notifications. Quality is consistent across languages.', '2026-04-05 08:45:00'],
-    [3, 'Thomas Andersen', 't.andersen@email.com', 'Been with The5ers for 6 months. Just hit my first scaling milestone — account went from $10K to $20K. The trailing drawdown takes some getting used to but the payout process is fast and reliable.', '2026-02-20 13:00:00'],
-    [3, 'Sofia Garcia', 'sofia.g@email.com', 'The Instant Funding program is exactly what it says. Funded within 24 hours of purchase. Trading has been smooth. Profit split is fair for what you get.', '2026-03-01 15:30:00'],
-    [6, 'Nomad_Kate', 'kate.nomad@email.com', 'Airalo is a must-have for frequent travelers. Used it across 12 countries in the past 6 months without a single connectivity issue. Europe regional plan is excellent value.', '2026-03-10 10:00:00'],
-    [6, 'Raj Patel', 'raj.p@email.com', 'Saved about $400 in roaming charges on a 3-week Europe trip. The instant activation is seamless. Only downside is no incoming calls, but WhatsApp calls over data work fine.', '2026-03-15 14:20:00'],
-    [15, 'Alex Turner', 'alex.t@email.com', 'The CopyTrader feature genuinely works. Been copying 3 different traders for 8 months — up 22% total. Just set it and review once a week. Great for passive investing.', '2026-04-18 09:30:00'],
-    [15, 'Chloe Martin', 'chloe.m@email.com', 'Zero commission stocks are great. The portfolio is clean and easy to navigate. Only wish the charting tools were more advanced for technical analysis.', '2026-04-20 11:00:00']
+    [1, 'Marcus Webb', 'm.webb@email.com', 'RunPod has been a game-changer for my Stable Diffusion projects. The RTX 4090 at $0.44/hr is unbeatable.', '2026-03-28 14:22:00'],
+    [1, 'Priya Sharma', 'priya.s@email.com', 'Great review! One thing to note — the Community Cloud can have pods terminated unexpectedly. Always use volumes for important data.', '2026-03-30 09:15:00'],
+    [2, 'Emma Rodriguez', 'emma.r@email.com', 'ElevenLabs voice cloning is incredible. Cloned my voice in under 10 minutes and the result was indistinguishable from the real thing.', '2026-04-03 11:30:00'],
+    [3, 'Thomas Andersen', 't.andersen@email.com', 'Been with The5ers for 6 months. Just hit my first scaling milestone. The trailing drawdown takes getting used to but the payout process is fast.', '2026-02-20 13:00:00'],
+    [6, 'Nomad_Kate', 'kate.nomad@email.com', 'Airalo is a must-have for frequent travelers. Used it across 12 countries in the past 6 months without a single connectivity issue.', '2026-03-10 10:00:00'],
+    [15, 'Alex Turner', 'alex.t@email.com', 'The CopyTrader feature genuinely works. Been copying 3 different traders for 8 months — up 22% total. Great for passive investing.', '2026-04-18 09:30:00'],
+    [16, 'Jake Morrison', 'jake.m@email.com', 'Repurpose.io saved my content team 12 hours per week. Our podcast now automatically appears as Shorts, Reels, and TikToks. Setup took about 2 hours.', '2026-04-22 11:00:00'],
+    [16, 'Mia Chen', 'mia.c@email.com', 'The caption accuracy is impressive. Only had issues with a few technical terms. Worth every dollar if you produce regular long-form content.', '2026-04-25 09:30:00'],
+    [17, 'Ryan Silva', 'ryan.s@email.com', 'Switched from Semrush to Search Atlas last month. The OTTO AI writer is genuinely useful for topical cluster content. Missing some Semrush integrations but the core SEO data is solid.', '2026-05-03 10:00:00'],
+    [18, 'Tom H', 'tom.h@email.com', 'PolyTerra PLA is legitimately the best PLA I\'ve used. The matte finish is gorgeous and it prints first layer perfect every time on my Bambu A1.', '2026-04-27 14:00:00'],
+    [19, 'Laura K', 'laura.k@email.com', 'Ordered the Belgian linen drapes for our living room. They arrived in 10 days, the quality is excellent, and they fit perfectly. Much better than department store curtains.', '2026-04-30 09:00:00'],
+    [20, 'GamingSetup_Joe', 'joe.gaming@email.com', 'LumiBricks transformed my gaming room. The music sync is insane — perfectly tracks the bass. Setup was straightforward and the app is way better than Govee.', '2026-05-04 15:00:00'],
   ];
   comments.forEach(c => insertComment.run(...c));
 
-  console.log('Database seeded successfully.');
+  console.log('Database seeded successfully with 20 posts across 10 categories.');
 }
 
 module.exports = { db, initDB };
