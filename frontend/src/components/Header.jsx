@@ -12,6 +12,7 @@ const categories = [
   { name: 'Dating', slug: 'dating' },
   { name: 'Gaming', slug: 'gaming' },
   { name: 'Music', slug: 'music' },
+  { name: 'Home & Living', slug: 'home-living' },
 ]
 
 export default function Header() {
