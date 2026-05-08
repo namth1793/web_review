@@ -112,10 +112,13 @@ export default function Footer() {
       <div className="border-t border-gray-700 py-4">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center text-xs text-gray-500 gap-2">
           <p>© {new Date().getFullYear()} InsignReview. All Rights Reserved.</p>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
             <Link to="/" className="hover:text-gray-300">Privacy Policy</Link>
             <Link to="/" className="hover:text-gray-300">Terms of Service</Link>
             <Link to="/about" className="hover:text-gray-300">Contact</Link>
+            <Link to="/admin/login" className="hover:text-gray-300 border border-gray-600 hover:border-gray-400 px-2.5 py-1 rounded transition-colors">
+              Admin
+            </Link>
           </div>
         </div>
       </div>
